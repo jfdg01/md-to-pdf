@@ -130,8 +130,7 @@ portada.
 
 ## Notas
 
-- En **Linux** la cabecera/pie usa Space Grotesk gracias a fontconfig; en
-  **Windows** Chrome usa las fuentes del sistema para esa zona, así que si no
-  tienes Space Grotesk instalada caerá a una sans-serif genérica (el cuerpo del
-  documento sí usa siempre las fuentes incrustadas en ambos sistemas).
+- Cabecera y pie se dibujan como una capa PDF con la fuente (Space Grotesk)
+  embebida, así que se ven igual en Windows y Linux sin instalar nada. El cuerpo
+  usa también las fuentes incrustadas en `fonts/` en ambos sistemas.
 - El tamaño de página es A4.
