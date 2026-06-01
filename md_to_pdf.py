@@ -16,15 +16,44 @@ import tempfile
 import os
 import sys
 import io
+import shutil
 import markdown
 from markdown.extensions.toc import TocExtension
 import websocket
 import pypdf
 from pathlib import Path
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
+
 LOGO_NAMES = ["logo_uja.webp", "logo_uja.png", "logo.webp", "logo.png"]
-SCRIPT_DIR = Path(__file__).parent
+SCRIPT_DIR = Path(__file__).resolve().parent
 FONTS_DIR = SCRIPT_DIR / "fonts"
+IS_WINDOWS = sys.platform.startswith("win")
+
+
+def find_chrome():
+    """Localiza el binario de Chrome/Chromium en Windows o Linux."""
+    names = (
+        ["chrome", "chrome.exe"]
+        if IS_WINDOWS
+        else ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"]
+    )
+    for n in names:
+        p = shutil.which(n)
+        if p:
+            return p
+    if IS_WINDOWS:
+        for env in ("ProgramFiles", "ProgramFiles(x86)", "LocalAppData"):
+            base = os.environ.get(env)
+            if base:
+                cand = Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe"
+                if cand.exists():
+                    return str(cand)
+    return None
 
 
 def font_face_css():
@@ -40,7 +69,7 @@ def font_face_css():
         rules += f"""
 @font-face {{
   font-family: 'Source Serif 4';
-  src: url('file://{serif_reg}') format('truetype');
+  src: url('{serif_reg.as_uri()}') format('truetype');
   font-weight: 100 900;
   font-style: normal;
 }}"""
@@ -48,7 +77,7 @@ def font_face_css():
         rules += f"""
 @font-face {{
   font-family: 'Source Serif 4';
-  src: url('file://{serif_ita}') format('truetype');
+  src: url('{serif_ita.as_uri()}') format('truetype');
   font-weight: 100 900;
   font-style: italic;
 }}"""
@@ -56,7 +85,7 @@ def font_face_css():
         rules += f"""
 @font-face {{
   font-family: 'Space Grotesk';
-  src: url('file://{grotesk}') format('truetype');
+  src: url('{grotesk.as_uri()}') format('truetype');
   font-weight: 300 700;
   font-style: normal;
 }}"""
@@ -64,7 +93,7 @@ def font_face_css():
         rules += f"""
 @font-face {{
   font-family: 'Space Mono';
-  src: url('file://{mono_reg}') format('truetype');
+  src: url('{mono_reg.as_uri()}') format('truetype');
   font-weight: 400;
   font-style: normal;
 }}"""
@@ -72,7 +101,7 @@ def font_face_css():
         rules += f"""
 @font-face {{
   font-family: 'Space Mono';
-  src: url('file://{mono_ita}') format('truetype');
+  src: url('{mono_ita.as_uri()}') format('truetype');
   font-weight: 400;
   font-style: italic;
 }}"""
@@ -80,7 +109,7 @@ def font_face_css():
         rules += f"""
 @font-face {{
   font-family: 'Space Mono';
-  src: url('file://{mono_bold}') format('truetype');
+  src: url('{mono_bold.as_uri()}') format('truetype');
   font-weight: 700;
   font-style: normal;
 }}"""
@@ -88,7 +117,7 @@ def font_face_css():
         rules += f"""
 @font-face {{
   font-family: 'Space Mono';
-  src: url('file://{mono_bita}') format('truetype');
+  src: url('{mono_bita.as_uri()}') format('truetype');
   font-weight: 700;
   font-style: italic;
 }}"""
@@ -99,7 +128,10 @@ def write_fontconfig():
     """Chrome renderiza header/footer en un contexto aislado que ignora @font-face;
     ahí solo usa fuentes que fontconfig pueda localizar. Generamos un fontconfig
     propio que incluye el del sistema y añade FONTS_DIR, y lo pasamos a Chrome vía
-    FONTCONFIG_FILE para que 'Space Grotesk' se resuelva por nombre sin instalarla."""
+    FONTCONFIG_FILE para que 'Space Grotesk' se resuelva por nombre sin instalarla.
+    Solo aplica en Linux; en Windows Chrome usa DirectWrite y no hay fontconfig."""
+    if IS_WINDOWS:
+        return None
     conf = f"""<?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
@@ -161,13 +193,11 @@ html, body {
 .toc-page h2 {
     font-family: 'Space Grotesk', Arial, sans-serif;
     font-size: 17.5pt;
-    border-bottom: 2px solid #333;
-    padding-bottom: 6px;
     margin-bottom: 20px;
 }
 .toc-page .toc { margin: 0; padding: 0; }
 .toc-page .toc ul { list-style: none; margin: 0; padding: 0; }
-.toc-page .toc li { padding: 5px 0; border-bottom: 1px dotted #ccc; }
+.toc-page .toc li { padding: 5px 0; }
 .toc-page .toc li li { padding-left: 2em; font-size: 12.5pt; font-weight: normal; }
 .toc-page .toc > ul > li { font-size: 13.5pt; font-weight: bold; }
 .toc-page .toc a { text-decoration: none; color: #1a1a1a; }
@@ -175,8 +205,9 @@ html, body {
 
 /* ── Contenido ── */
 h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; }
-h1 { font-size: 23.5pt; border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 16px; }
-h2 { font-size: 17.5pt; border-bottom: 1px solid #aaa; padding-bottom: 4px; margin-top: 28px; }
+h1 { font-size: 23.5pt; margin-bottom: 16px; }
+h1:not(:first-of-type) { page-break-before: always; }
+h2 { font-size: 17.5pt; margin-top: 28px; }
 h3 { font-size: 14pt; margin-top: 20px; color: #222; }
 code {
     font-family: 'Space Mono', 'DejaVu Sans Mono', 'Liberation Mono', monospace;
@@ -205,7 +236,7 @@ blockquote {
     color: #555;
     background: #fafafa;
 }
-hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }
+hr { border: none; margin: 28px 0; }
 """
 
 DEBUG_PORT = 9333
@@ -336,11 +367,11 @@ def toc_content_html(meta, md_text):
 
 
 def merge_pdfs(*pdf_bytes_list):
+    # append() (no add_page) preserva los enlaces internos y destinos con nombre,
+    # así los links del índice siguen saltando a su sección tras fusionar.
     writer = pypdf.PdfWriter()
     for b in pdf_bytes_list:
-        reader = pypdf.PdfReader(io.BytesIO(b))
-        for page in reader.pages:
-            writer.add_page(page)
+        writer.append(io.BytesIO(b))
     out = io.BytesIO()
     writer.write(out)
     return out.getvalue()
@@ -350,7 +381,7 @@ def make_header(meta):
     parts = " · ".join(filter(None, [meta["title"], meta["subject"]]))
     return (
         f'<div style="font-family:\'Space Grotesk\',Arial,sans-serif;font-size:9.5pt;color:#666;'
-        f'width:100%;border-bottom:1px solid #ccc;padding-bottom:3px;'
+        f'width:100%;padding-bottom:3px;'
         f'margin:0 0.8cm;box-sizing:border-box;text-align:center;">{parts}</div>'
     )
 
@@ -377,11 +408,19 @@ if not md_files:
     print("No hay archivos .md")
     sys.exit(1)
 
+chrome_bin = find_chrome()
+if not chrome_bin:
+    print("No se encontró Chrome/Chromium. Instálalo o añádelo al PATH.")
+    sys.exit(1)
+
 fc_path = write_fontconfig()
+chrome_env = {**os.environ}
+if fc_path:
+    chrome_env["FONTCONFIG_FILE"] = fc_path
 
 chrome = subprocess.Popen(
     [
-        "google-chrome",
+        chrome_bin,
         "--headless=new",
         "--disable-gpu",
         "--no-sandbox",
@@ -393,7 +432,7 @@ chrome = subprocess.Popen(
     ],
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
-    env={**os.environ, "FONTCONFIG_FILE": fc_path},
+    env=chrome_env,
 )
 
 if not wait_for_chrome():
@@ -422,7 +461,7 @@ try:
                 tmp = f.name
             try:
                 send("Page.enable", {})
-                send("Page.navigate", {"url": f"file://{tmp}"})
+                send("Page.navigate", {"url": Path(tmp).resolve().as_uri()})
                 wait_event("Page.loadEventFired", timeout=10)
                 time.sleep(0.3)
                 result = send("Page.printToPDF", {
@@ -454,5 +493,5 @@ try:
 finally:
     chrome.terminate()
     chrome.wait()
-    if os.path.exists(fc_path):
+    if fc_path and os.path.exists(fc_path):
         os.unlink(fc_path)

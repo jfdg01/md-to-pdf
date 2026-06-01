@@ -1,0 +1,3 @@
+markdown
+websocket-client
+pypdf
