@@ -16,8 +16,8 @@ Space Grotesk, Space Mono) viajan con el repositorio en `fonts/`.
   - Linux: `google-chrome` / `chromium` en el `PATH`.
   - Windows: Chrome en la ruta habitual de *Program Files* (se detecta solo).
 
-Las dependencias de Python (`markdown`, `websocket-client`, `pypdf`) se instalan
-en un entorno virtual propio (`.venv/`) por el script de instalación.
+Las dependencias de Python (`markdown`, `websocket-client`, `pypdf`, `reportlab`)
+se instalan en un entorno virtual propio (`.venv/`) por el script de instalación.
 
 ---
 
@@ -134,5 +134,11 @@ portada.
 
 - Cabecera y pie se dibujan como una capa PDF con la fuente (Space Grotesk)
   embebida, así que se ven igual en Windows y Linux sin instalar nada. El cuerpo
-  usa también las fuentes incrustadas en `fonts/` en ambos sistemas.
+  usa también las fuentes incrustadas en `fonts/` en ambos sistemas. Si el título
+  es muy largo, la cabecera se recorta con «…» para no salirse del margen.
+- El PDF lleva metadatos de documento (título, autor y asignatura), visibles en
+  las propiedades del visor.
+- Al convertir varios ficheros, si uno falla se informa con `[ERROR: …]` y se
+  continúa con el resto; el comando termina con código distinto de cero si hubo
+  algún fallo.
 - El tamaño de página es A4.

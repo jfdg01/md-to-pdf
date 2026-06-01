@@ -17,6 +17,8 @@ import os
 import sys
 import io
 import shutil
+import socket
+from html import escape
 import markdown
 from markdown.extensions.toc import TocExtension
 import websocket
@@ -225,7 +227,16 @@ blockquote {
 hr { border: none; margin: 28px 0; }
 """
 
-DEBUG_PORT = 9333
+DEBUG_PORT = 9333  # por defecto; main() escoge un puerto libre real al arrancar
+
+
+def _free_port():
+    """Pide al SO un puerto TCP libre para el remote-debugging de Chrome (evita
+    choques si quedó un Chrome colgado en un puerto fijo o si se lanzan dos
+    conversiones a la vez)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def wait_for_chrome(timeout=10):
@@ -299,10 +310,15 @@ def find_logo(md_path):
 
 
 def cover_html(meta, logo_uri):
-    """Portada standalone — se renderiza sin header/footer."""
+    """Portada standalone — se renderiza sin header/footer. Los metadatos se
+    escapan como HTML para que un '&', '<' o '>' en el título/autor no rompa la
+    página (el cuerpo ya lo escapa markdown; la cabecera/pie son texto plano)."""
+    title   = escape(meta["title"])
+    subject = escape(meta["subject"])
+    author  = escape(meta["author"])
     logo_tag = f'<img class="logo" src="{logo_uri}" alt="Logo UJA">' if logo_uri else ""
-    master_line = f'<p class="meta-line">{meta["master"]}</p>' if meta["master"] else ""
-    curso_line  = f'<p class="meta-line">Curso {meta["curso"]}</p>' if meta["curso"] else ""
+    master_line = f'<p class="meta-line">{escape(meta["master"])}</p>' if meta["master"] else ""
+    curso_line  = f'<p class="meta-line">Curso {escape(meta["curso"])}</p>' if meta["curso"] else ""
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -312,13 +328,13 @@ def cover_html(meta, logo_uri):
 <body>
 <div class="cover">
   <div class="top">
-    <h1>{meta["title"]}</h1>
-    <p class="subtitle">{meta["subject"]}</p>
+    <h1>{title}</h1>
+    <p class="subtitle">{subject}</p>
     {master_line}
     {curso_line}
     {logo_tag}
   </div>
-  <p class="author">Realizado por {meta["author"]}</p>
+  <p class="author">Realizado por {author}</p>
 </div>
 </body>
 </html>"""
@@ -343,7 +359,7 @@ def toc_content_html(meta, md_text):
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <style>@page {{ margin: 1.4in 0.85in 1.15in 0.85in; }}{font_face_css()}{CSS}</style>
+  <style>@page {{ margin: 1.15in 0.85in 0.95in 0.85in; }}{font_face_css()}{CSS}</style>
 </head>
 <body>
 <div class="toc-page">
@@ -382,6 +398,17 @@ def register_hf_font():
     return _hf_font_ready
 
 
+def _fit_text(text, font, size, max_w):
+    """Recorta `text` con una elipsis si su anchura supera `max_w` puntos, para
+    que la cabecera/pie no se salgan de los márgenes con títulos largos."""
+    if not text or pdfmetrics.stringWidth(text, font, size) <= max_w:
+        return text
+    ell = "…"
+    while text and pdfmetrics.stringWidth(text + ell, font, size) > max_w:
+        text = text[:-1]
+    return text.rstrip() + ell if text else ell
+
+
 def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69, side_margin=0.85):
     """Genera un PDF de `num_pages` páginas con la cabecera (título · asignatura)
     y el pie (autor centrado, 'n / total' a la derecha) para superponer al
@@ -392,6 +419,9 @@ def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69, side_mar
     c = canvas.Canvas(buf, pagesize=(pw, ph))
     header_text = " · ".join(filter(None, [meta["title"], meta["subject"]]))
     author = meta["author"]
+    avail = pw - 2 * side_margin * inch
+    header_text = _fit_text(header_text, font, 9.5, avail)
+    author = _fit_text(author, font, 9.5, avail - 1.2 * inch)  # deja sitio al "n / total"
     for i in range(1, num_pages + 1):
         c.setFont(font, 9.5)
         c.setFillColorRGB(0.4, 0.4, 0.4)  # ~#666
@@ -457,98 +487,147 @@ def assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens=None):
 
     add_outline(writer, content_bytes, first_content, toc_tokens)
 
+    info = {tag: val for tag, val in (
+        ("/Title", meta.get("title")),
+        ("/Author", meta.get("author")),
+        ("/Subject", meta.get("subject")),
+    ) if val}
+    if info:
+        try:
+            writer.add_metadata(info)
+        except Exception:
+            pass
+
     out = io.BytesIO()
     writer.write(out)
     return out.getvalue()
 
 
-if len(sys.argv) > 1:
-    md_files = [Path(p) for p in sys.argv[1:]]
-else:
-    md_files = sorted(Path(".").glob("*.md"))
-
-if not md_files:
-    print("No hay archivos .md")
-    sys.exit(1)
-
-chrome_bin = find_chrome()
-if not chrome_bin:
-    print("No se encontró Chrome/Chromium. Instálalo o añádelo al PATH.")
-    sys.exit(1)
-
-chrome = subprocess.Popen(
-    [
-        chrome_bin,
-        "--headless=new",
-        "--disable-gpu",
-        "--no-sandbox",
-        f"--remote-debugging-port={DEBUG_PORT}",
-        "--remote-allow-origins=*",
-        "--disable-extensions",
-        "--disable-features=site-per-process",
-        "about:blank",
-    ],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-    env=os.environ,
-)
-
-if not wait_for_chrome():
-    print("Chrome no arrancó a tiempo")
-    chrome.terminate()
-    sys.exit(1)
-
-try:
-    targets = json.loads(
-        urllib.request.urlopen(f"http://localhost:{DEBUG_PORT}/json").read()
-    )
-    page_target = next(t for t in targets if t["type"] == "page")
-    ws, send, wait_event = cdp_session(page_target["webSocketDebuggerUrl"])
-
-    for md_path in md_files:
-        pdf_path = md_path.with_suffix(".pdf")
-        print(f"  {md_path.name} → {pdf_path.name}", end=" ", flush=True)
-
-        md_text = md_path.read_text(encoding="utf-8")
-        meta = extract_meta(md_text)
-        logo_uri = find_logo(md_path)
-
-        def render(html, *, margin_top=0.8, margin_bottom=0.8, margin_lr=0.8):
-            # La cabecera/pie ya no las dibuja Chrome (las estampamos después con
-            # reportlab), pero dejamos márgenes arriba/abajo para que entren.
-            with tempfile.NamedTemporaryFile(suffix=".html", mode="w", encoding="utf-8", delete=False) as f:
-                f.write(html)
-                tmp = f.name
+def make_render(send, wait_event):
+    """Devuelve la función que renderiza un HTML a PDF vía Chrome (printToPDF).
+    Se crea una sola vez por sesión, no por archivo."""
+    def render(html, *, margin_top, margin_bottom, margin_lr):
+        # La cabecera/pie ya no las dibuja Chrome (las estampamos después con
+        # reportlab), pero dejamos márgenes arriba/abajo para que entren.
+        with tempfile.NamedTemporaryFile(suffix=".html", mode="w", encoding="utf-8", delete=False) as f:
+            f.write(html)
+            tmp = f.name
+        try:
+            send("Page.enable", {})
+            send("Page.navigate", {"url": Path(tmp).resolve().as_uri()})
+            wait_event("Page.loadEventFired", timeout=10)
+            # Esperar a que las webfonts estén listas (en vez de un sleep fijo):
+            # evita carreras de carga de fuentes que daban fallbacks erróneos.
             try:
-                send("Page.enable", {})
-                send("Page.navigate", {"url": Path(tmp).resolve().as_uri()})
-                wait_event("Page.loadEventFired", timeout=10)
-                time.sleep(0.3)
-                result = send("Page.printToPDF", {
-                    "printBackground": True,
-                    "displayHeaderFooter": False,
-                    "marginTop": margin_top,
-                    "marginBottom": margin_bottom,
-                    "marginLeft": margin_lr,
-                    "marginRight": margin_lr,
-                    "paperWidth": 8.27,
-                    "paperHeight": 11.69,
+                send("Runtime.evaluate", {
+                    "expression": "document.fonts.ready.then(() => true)",
+                    "awaitPromise": True,
+                    "returnByValue": True,
                 })
-                return base64.b64decode(result["result"]["data"])
-            finally:
-                os.unlink(tmp)
+            except Exception:
+                time.sleep(0.3)
+            time.sleep(0.1)  # pequeño margen para el reflow tras aplicar fuentes
+            result = send("Page.printToPDF", {
+                "printBackground": True,
+                "displayHeaderFooter": False,
+                "marginTop": margin_top,
+                "marginBottom": margin_bottom,
+                "marginLeft": margin_lr,
+                "marginRight": margin_lr,
+                "paperWidth": 8.27,
+                "paperHeight": 11.69,
+            })
+            return base64.b64decode(result["result"]["data"])
+        finally:
+            os.unlink(tmp)
+    return render
 
-        content_html, toc_tokens = toc_content_html(meta, md_text)
-        cover_bytes   = render(cover_html(meta, logo_uri),
-                               margin_top=0, margin_bottom=0, margin_lr=0)
-        content_bytes = render(content_html,
-                               margin_top=1.4, margin_bottom=1.15, margin_lr=0.85)
 
-        pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens)
-        pdf_path.write_bytes(pdf_bytes)
-        print(f"[OK, {len(pdf_bytes) // 1024} KB]")
+def convert_one(md_path, render):
+    """Convierte un único .md a .pdf junto a él. Lanza excepción si algo falla."""
+    pdf_path = md_path.with_suffix(".pdf")
+    md_text = md_path.read_text(encoding="utf-8")
+    meta = extract_meta(md_text)
+    logo_uri = find_logo(md_path)
 
-    ws.close()
-finally:
-    chrome.terminate()
-    chrome.wait()
+    content_html, toc_tokens = toc_content_html(meta, md_text)
+    cover_bytes   = render(cover_html(meta, logo_uri),
+                           margin_top=0, margin_bottom=0, margin_lr=0)
+    content_bytes = render(content_html,
+                           margin_top=1.15, margin_bottom=0.95, margin_lr=0.85)
+
+    pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens)
+    pdf_path.write_bytes(pdf_bytes)
+    return len(pdf_bytes)
+
+
+def main():
+    global DEBUG_PORT
+
+    if len(sys.argv) > 1:
+        md_files = [Path(p) for p in sys.argv[1:]]
+    else:
+        md_files = sorted(Path(".").glob("*.md"))
+
+    if not md_files:
+        print("No hay archivos .md")
+        sys.exit(1)
+
+    chrome_bin = find_chrome()
+    if not chrome_bin:
+        print("No se encontró Chrome/Chromium. Instálalo o añádelo al PATH.")
+        sys.exit(1)
+
+    DEBUG_PORT = _free_port()
+    chrome = subprocess.Popen(
+        [
+            chrome_bin,
+            "--headless=new",
+            "--disable-gpu",
+            "--no-sandbox",
+            f"--remote-debugging-port={DEBUG_PORT}",
+            "--remote-allow-origins=*",
+            "--disable-extensions",
+            "--disable-features=site-per-process",
+            "about:blank",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=os.environ,
+    )
+
+    if not wait_for_chrome():
+        print("Chrome no arrancó a tiempo")
+        chrome.terminate()
+        sys.exit(1)
+
+    failures = 0
+    try:
+        targets = json.loads(
+            urllib.request.urlopen(f"http://localhost:{DEBUG_PORT}/json").read()
+        )
+        page_target = next(t for t in targets if t["type"] == "page")
+        ws, send, wait_event = cdp_session(page_target["webSocketDebuggerUrl"])
+        render = make_render(send, wait_event)
+
+        for md_path in md_files:
+            pdf_path = md_path.with_suffix(".pdf")
+            print(f"  {md_path.name} → {pdf_path.name}", end=" ", flush=True)
+            try:
+                kb = convert_one(md_path, render) // 1024
+                print(f"[OK, {kb} KB]")
+            except Exception as e:
+                failures += 1
+                print(f"[ERROR: {e}]")
+
+        ws.close()
+    finally:
+        chrome.terminate()
+        chrome.wait()
+
+    if failures:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
