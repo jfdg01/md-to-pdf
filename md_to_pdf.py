@@ -209,9 +209,10 @@ pre {
     padding: 12px;
     font-size: 10.5pt;
     line-height: 1.4;
+    page-break-inside: avoid;  /* no partir bloques de código entre páginas */
 }
 pre code { background: none; padding: 0; }
-table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12pt; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12pt; page-break-inside: avoid; }
 th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
 th { background: #e8e8e8; font-weight: bold; }
 blockquote {
@@ -342,7 +343,7 @@ def toc_content_html(meta, md_text):
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <style>@page {{ margin: 2cm; }}{font_face_css()}{CSS}</style>
+  <style>@page {{ margin: 1.4in 0.85in 1.15in 0.85in; }}{font_face_css()}{CSS}</style>
 </head>
 <body>
 <div class="toc-page">
@@ -381,7 +382,7 @@ def register_hf_font():
     return _hf_font_ready
 
 
-def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69, side_margin=0.8):
+def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69, side_margin=0.85):
     """Genera un PDF de `num_pages` páginas con la cabecera (título · asignatura)
     y el pie (autor centrado, 'n / total' a la derecha) para superponer al
     contenido. Tamaños en pulgadas, igual que printToPDF."""
@@ -541,7 +542,7 @@ try:
         cover_bytes   = render(cover_html(meta, logo_uri),
                                margin_top=0, margin_bottom=0, margin_lr=0)
         content_bytes = render(content_html,
-                               margin_top=1.45, margin_bottom=1.2)
+                               margin_top=1.4, margin_bottom=1.15, margin_lr=0.85)
 
         pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens)
         pdf_path.write_bytes(pdf_bytes)
