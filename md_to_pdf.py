@@ -21,6 +21,10 @@ import markdown
 from markdown.extensions.toc import TocExtension
 import websocket
 import pypdf
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.units import inch
 from pathlib import Path
 
 for _stream in (sys.stdout, sys.stderr):
@@ -122,27 +126,6 @@ def font_face_css():
   font-style: italic;
 }}"""
     return rules
-
-
-def write_fontconfig():
-    """Chrome renderiza header/footer en un contexto aislado que ignora @font-face;
-    ahí solo usa fuentes que fontconfig pueda localizar. Generamos un fontconfig
-    propio que incluye el del sistema y añade FONTS_DIR, y lo pasamos a Chrome vía
-    FONTCONFIG_FILE para que 'Space Grotesk' se resuelva por nombre sin instalarla.
-    Solo aplica en Linux; en Windows Chrome usa DirectWrite y no hay fontconfig."""
-    if IS_WINDOWS:
-        return None
-    conf = f"""<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-<fontconfig>
-  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
-  <dir>{FONTS_DIR.resolve()}</dir>
-</fontconfig>
-"""
-    fd, path = tempfile.mkstemp(suffix=".conf", prefix="mdpdf-fc-")
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(conf)
-    return path
 
 
 CSS = """
@@ -368,37 +351,79 @@ def toc_content_html(meta, md_text):
 </html>"""
 
 
-def merge_pdfs(*pdf_bytes_list):
-    # append() (no add_page) preserva los enlaces internos y destinos con nombre,
-    # así los links del índice siguen saltando a su sección tras fusionar.
+HF_FONT = "SpaceGroteskHF"
+_hf_font_ready = None
+
+
+def register_hf_font():
+    """Registra Space Grotesk en reportlab para dibujar cabecera/pie. Chrome
+    renderiza su cabecera/pie en un contexto aislado que ignora @font-face y solo
+    usa fuentes del sistema (distinto en Windows y Linux), así que en su lugar las
+    pintamos nosotros como una capa PDF con la fuente embebida: idéntico en ambos
+    sistemas y sin instalar nada. Devuelve el nombre de fuente a usar."""
+    global _hf_font_ready
+    if _hf_font_ready is not None:
+        return _hf_font_ready
+    for cand in (
+        FONTS_DIR / "Space_Grotesk" / "static" / "SpaceGrotesk-Medium.ttf",
+        FONTS_DIR / "Space_Grotesk" / "static" / "SpaceGrotesk-Regular.ttf",
+        FONTS_DIR / "Space_Grotesk" / "SpaceGrotesk-VariableFont_wght.ttf",
+    ):
+        if cand.exists():
+            pdfmetrics.registerFont(TTFont(HF_FONT, str(cand)))
+            _hf_font_ready = HF_FONT
+            return HF_FONT
+    _hf_font_ready = "Helvetica"  # respaldo si faltara la fuente
+    return _hf_font_ready
+
+
+def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69, side_margin=0.8):
+    """Genera un PDF de `num_pages` páginas con la cabecera (título · asignatura)
+    y el pie (autor centrado, 'n / total' a la derecha) para superponer al
+    contenido. Tamaños en pulgadas, igual que printToPDF."""
+    font = register_hf_font()
+    pw, ph = paper_w * inch, paper_h * inch
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(pw, ph))
+    header_text = " · ".join(filter(None, [meta["title"], meta["subject"]]))
+    author = meta["author"]
+    for i in range(1, num_pages + 1):
+        c.setFont(font, 9.5)
+        c.setFillColorRGB(0.4, 0.4, 0.4)  # ~#666
+        if header_text:
+            c.drawCentredString(pw / 2, ph - 0.75 * inch, header_text)
+        if author:
+            c.drawCentredString(pw / 2, 0.55 * inch, author)
+        c.drawRightString(pw - side_margin * inch, 0.55 * inch, f"{i} / {num_pages}")
+        c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf
+
+
+def assemble_pdf(cover_bytes, content_bytes, meta):
+    """Une portada + contenido y estampa cabecera/pie solo en las páginas de
+    contenido. Usa append() (no add_page) para conservar los enlaces internos
+    del índice; el estampado por merge_page no afecta a esos destinos."""
     writer = pypdf.PdfWriter()
-    for b in pdf_bytes_list:
-        writer.append(io.BytesIO(b))
+    writer.append(io.BytesIO(cover_bytes))
+    first_content = len(writer.pages)
+    writer.append(io.BytesIO(content_bytes))
+
+    content_pages = writer.pages[first_content:]
+    overlay = pypdf.PdfReader(header_footer_overlay(meta, len(content_pages)))
+    for page, ov in zip(content_pages, overlay.pages):
+        page.merge_page(ov)
+
+    # merge_page deja objetos repetidos por página; deduplicar recorta algo el PDF.
+    try:
+        writer.compress_identical_objects()
+    except Exception:
+        pass
+
     out = io.BytesIO()
     writer.write(out)
     return out.getvalue()
-
-
-def make_header(meta):
-    parts = " · ".join(filter(None, [meta["title"], meta["subject"]]))
-    return (
-        f'<div style="font-family:\'Space Grotesk\',Arial,sans-serif;font-weight:500;font-size:9.5pt;color:#666;'
-        f'width:100%;padding-bottom:3px;'
-        f'margin:0 0.8cm;box-sizing:border-box;text-align:center;">{parts}</div>'
-    )
-
-
-def make_footer(meta):
-    return (
-        f'<div style="font-family:\'Space Grotesk\',Arial,sans-serif;font-weight:500;font-size:9.5pt;color:#666;'
-        f'width:100%;display:flex;align-items:center;margin:0 0.8cm;box-sizing:border-box;">'
-        f'<span style="flex:1;"></span>'
-        f'<span style="flex:1;text-align:center;">{meta["author"]}</span>'
-        f'<span style="flex:1;text-align:right;">'
-        f'<span class="pageNumber"></span> / <span class="totalPages"></span>'
-        f'</span>'
-        f'</div>'
-    )
 
 
 if len(sys.argv) > 1:
@@ -415,11 +440,6 @@ if not chrome_bin:
     print("No se encontró Chrome/Chromium. Instálalo o añádelo al PATH.")
     sys.exit(1)
 
-fc_path = write_fontconfig()
-chrome_env = {**os.environ}
-if fc_path:
-    chrome_env["FONTCONFIG_FILE"] = fc_path
-
 chrome = subprocess.Popen(
     [
         chrome_bin,
@@ -434,7 +454,7 @@ chrome = subprocess.Popen(
     ],
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
-    env=chrome_env,
+    env=os.environ,
 )
 
 if not wait_for_chrome():
@@ -457,7 +477,9 @@ try:
         meta = extract_meta(md_text)
         logo_uri = find_logo(md_path)
 
-        def render(html, *, display_hf=False, margin_top=0.8, margin_bottom=0.8, margin_lr=0.8):
+        def render(html, *, margin_top=0.8, margin_bottom=0.8, margin_lr=0.8):
+            # La cabecera/pie ya no las dibuja Chrome (las estampamos después con
+            # reportlab), pero dejamos márgenes arriba/abajo para que entren.
             with tempfile.NamedTemporaryFile(suffix=".html", mode="w", encoding="utf-8", delete=False) as f:
                 f.write(html)
                 tmp = f.name
@@ -468,9 +490,7 @@ try:
                 time.sleep(0.3)
                 result = send("Page.printToPDF", {
                     "printBackground": True,
-                    "displayHeaderFooter": display_hf,
-                    "headerTemplate": make_header(meta),
-                    "footerTemplate": make_footer(meta),
+                    "displayHeaderFooter": False,
                     "marginTop": margin_top,
                     "marginBottom": margin_bottom,
                     "marginLeft": margin_lr,
@@ -485,9 +505,9 @@ try:
         cover_bytes   = render(cover_html(meta, logo_uri),
                                margin_top=0, margin_bottom=0, margin_lr=0)
         content_bytes = render(toc_content_html(meta, md_text),
-                               display_hf=True, margin_top=1.2, margin_bottom=1.0)
+                               margin_top=1.2, margin_bottom=1.0)
 
-        pdf_bytes = merge_pdfs(cover_bytes, content_bytes)
+        pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta)
         pdf_path.write_bytes(pdf_bytes)
         print(f"[OK, {len(pdf_bytes) // 1024} KB]")
 
@@ -495,5 +515,3 @@ try:
 finally:
     chrome.terminate()
     chrome.wait()
-    if fc_path and os.path.exists(fc_path):
-        os.unlink(fc_path)
