@@ -324,7 +324,9 @@ def cover_html(meta, logo_uri):
 
 
 def toc_content_html(meta, md_text):
-    """Índice + contenido en un único HTML para que los links anchor funcionen."""
+    """Índice + contenido en un único HTML para que los links anchor funcionen.
+    Devuelve (html, toc_tokens); toc_tokens es el árbol de encabezados (nivel,
+    id, nombre, hijos) que usamos para construir el marcador/outline del PDF."""
     parts = md_text.split("\n---\n", 1)
     body_md = parts[1] if len(parts) > 1 else md_text
 
@@ -334,8 +336,9 @@ def toc_content_html(meta, md_text):
     )
     content_body = md.convert(body_md)
     toc_tree = md.toc
+    toc_tokens = md.toc_tokens
 
-    return f"""<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
@@ -349,6 +352,7 @@ def toc_content_html(meta, md_text):
 {content_body}
 </body>
 </html>"""
+    return html, toc_tokens
 
 
 HF_FONT = "SpaceGroteskHF"
@@ -401,10 +405,39 @@ def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69, side_mar
     return buf
 
 
-def assemble_pdf(cover_bytes, content_bytes, meta):
-    """Une portada + contenido y estampa cabecera/pie solo en las páginas de
-    contenido. Usa append() (no add_page) para conservar los enlaces internos
-    del índice; el estampado por merge_page no afecta a esos destinos."""
+def add_outline(writer, content_bytes, first_content, toc_tokens):
+    """Crea el outline (marcadores) del PDF a partir del árbol de encabezados,
+    mapeando cada id a su página vía los destinos con nombre del contenido. Así
+    el visor muestra la estructura del documento en su panel lateral."""
+    if not toc_tokens:
+        return
+    reader = pypdf.PdfReader(io.BytesIO(content_bytes))
+    id_to_page = {}
+    for name, dest in reader.named_destinations.items():
+        try:
+            pno = reader.get_destination_page_number(dest)
+        except Exception:
+            pno = None
+        if pno is not None:
+            id_to_page[str(name).lstrip("/")] = first_content + pno
+
+    def walk(tokens, parent):
+        for t in tokens:
+            title = (t.get("name") or t.get("id") or "").strip()
+            page = id_to_page.get(t.get("id", ""))
+            if title and page is not None:
+                item = writer.add_outline_item(title, page, parent=parent)
+            else:
+                item = parent  # sin destino: cuelga los hijos del nivel actual
+            walk(t.get("children", []), item)
+
+    walk(toc_tokens, None)
+
+
+def assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens=None):
+    """Une portada + contenido, estampa cabecera/pie solo en las páginas de
+    contenido y añade el outline. Usa append() (no add_page) para conservar los
+    enlaces internos del índice; el estampado por merge_page no toca esos destinos."""
     writer = pypdf.PdfWriter()
     writer.append(io.BytesIO(cover_bytes))
     first_content = len(writer.pages)
@@ -420,6 +453,8 @@ def assemble_pdf(cover_bytes, content_bytes, meta):
         writer.compress_identical_objects()
     except Exception:
         pass
+
+    add_outline(writer, content_bytes, first_content, toc_tokens)
 
     out = io.BytesIO()
     writer.write(out)
@@ -502,12 +537,13 @@ try:
             finally:
                 os.unlink(tmp)
 
+        content_html, toc_tokens = toc_content_html(meta, md_text)
         cover_bytes   = render(cover_html(meta, logo_uri),
                                margin_top=0, margin_bottom=0, margin_lr=0)
-        content_bytes = render(toc_content_html(meta, md_text),
-                               margin_top=1.2, margin_bottom=1.0)
+        content_bytes = render(content_html,
+                               margin_top=1.45, margin_bottom=1.2)
 
-        pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta)
+        pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens)
         pdf_path.write_bytes(pdf_bytes)
         print(f"[OK, {len(pdf_bytes) // 1024} KB]")
 
