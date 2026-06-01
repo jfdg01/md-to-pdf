@@ -117,6 +117,8 @@ Todos son opcionales salvo el título. El orden no importa.
 - **`### ` = subsección.** No fuerza salto de página.
 - **El índice** lista automáticamente los `##` y `###`, con enlaces que saltan
   a la sección correspondiente al hacer clic.
+- **El PDF incluye un outline/marcadores** con la misma jerarquía de secciones,
+  que el visor muestra en su panel lateral para navegar el documento.
 - Funciona el Markdown habitual: **negrita**, *cursiva*, listas, tablas,
   `código` en línea y bloques con triple acento grave (```` ``` ````), citas.
 
