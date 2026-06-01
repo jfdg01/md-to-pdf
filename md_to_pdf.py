@@ -206,7 +206,9 @@ html, body {
 /* ── Contenido ── */
 h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; }
 h1 { font-size: 23.5pt; margin-bottom: 16px; }
-h1:not(:first-of-type) { page-break-before: always; }
+/* Cada sección de nivel ## empieza en página nueva (salvo la primera, para no
+   dejar una página en blanco tras el índice). Las subsecciones ### no rompen. */
+h2:not(:first-of-type) { page-break-before: always; }
 h2 { font-size: 17.5pt; margin-top: 28px; }
 h3 { font-size: 14pt; margin-top: 20px; color: #222; }
 code {
@@ -380,7 +382,7 @@ def merge_pdfs(*pdf_bytes_list):
 def make_header(meta):
     parts = " · ".join(filter(None, [meta["title"], meta["subject"]]))
     return (
-        f'<div style="font-family:\'Space Grotesk\',Arial,sans-serif;font-size:9.5pt;color:#666;'
+        f'<div style="font-family:\'Space Grotesk\',Arial,sans-serif;font-weight:500;font-size:9.5pt;color:#666;'
         f'width:100%;padding-bottom:3px;'
         f'margin:0 0.8cm;box-sizing:border-box;text-align:center;">{parts}</div>'
     )
@@ -388,7 +390,7 @@ def make_header(meta):
 
 def make_footer(meta):
     return (
-        f'<div style="font-family:\'Space Grotesk\',Arial,sans-serif;font-size:9.5pt;color:#666;'
+        f'<div style="font-family:\'Space Grotesk\',Arial,sans-serif;font-weight:500;font-size:9.5pt;color:#666;'
         f'width:100%;display:flex;align-items:center;margin:0 0.8cm;box-sizing:border-box;">'
         f'<span style="flex:1;"></span>'
         f'<span style="flex:1;text-align:center;">{meta["author"]}</span>'
