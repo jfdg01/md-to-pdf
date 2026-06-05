@@ -233,6 +233,12 @@ figure { margin: 14px auto; text-align: center; page-break-inside: avoid; }
 figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 figcaption { font-size: 11pt; color: #555; margin-top: 5px; font-style: italic; }
 caption { caption-side: top; font-size: 11pt; color: #555; padding-bottom: 6px; font-style: italic; text-align: center; }
+.index-page { page-break-after: always; font-family: 'Source Serif 4', Georgia, serif; }
+.index-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17.5pt; margin-bottom: 20px; }
+.index-page .doc-index { list-style: none; margin: 0; padding: 0; }
+.index-page .doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 13pt; }
+.index-page .doc-index a { text-decoration: none; color: #1a1a1a; }
+.index-page .idx-label { font-weight: bold; min-width: 7em; display: inline-block; }
 """
 
 DEBUG_PORT = 9333  # por defecto; main() escoge un puerto libre real al arrancar
@@ -363,7 +369,9 @@ def toc_content_html(meta, md_text):
     toc_tree = md.toc
     toc_tokens = md.toc_tokens
 
-    content_body = add_figure_table_numbers(content_body)
+    content_body, figures, tables = add_figure_table_numbers(content_body)
+    fig_idx = _figures_index_html(figures)
+    tab_idx = _tables_index_html(tables)
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -375,18 +383,22 @@ def toc_content_html(meta, md_text):
   <h2>Índice de contenidos</h2>
   {toc_tree}
 </div>
-{content_body}
+{fig_idx}{tab_idx}{content_body}
 </body>
 </html>"""
     return html, toc_tokens
 
 
 def add_figure_table_numbers(html):
-    """Add Figura x.y / Tabla x.y labels to images and tables, resetting
-    per-section counters on each <h2> (one counter per document section)."""
+    """Returns (processed_html, figures, tables).
+    figures: [(label, alt_text, anchor_id), ...]
+    tables:  [(label, anchor_id), ...]
+    Counters reset on each <h2> section."""
     section = [0]
     figs = [0]
     tabs = [0]
+    figures = []
+    tables = []
     pattern = re.compile(r'<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>')
 
     def sub(m):
@@ -402,16 +414,56 @@ def add_figure_table_numbers(html):
                 return tag
             figs[0] += 1
             label = f"Figura {section[0]}.{figs[0]}"
-            return f'<figure>{tag}<figcaption>{label}</figcaption></figure>'
+            fig_id = f"fig-{section[0]}-{figs[0]}"
+            alt_m = re.search(r'\balt="([^"]*)"', tag)
+            alt = alt_m.group(1) if alt_m else ""
+            figures.append((label, alt, fig_id))
+            return f'<figure id="{fig_id}">{tag}<figcaption>{label}</figcaption></figure>'
         if lo.startswith('<table'):
             if not section[0]:
                 return tag
             tabs[0] += 1
             label = f"Tabla {section[0]}.{tabs[0]}"
-            return f'{tag}<caption>{label}</caption>'
+            tab_id = f"tab-{section[0]}-{tabs[0]}"
+            tables.append((label, tab_id))
+            new_tag = tag[:-1] + f' id="{tab_id}">'
+            return f'{new_tag}<caption>{label}</caption>'
         return tag
 
-    return pattern.sub(sub, html)
+    return pattern.sub(sub, html), figures, tables
+
+
+def _index_page(title, rows):
+    if not rows:
+        return ""
+    items = "\n".join(f'    <li>{r}</li>' for r in rows)
+    return (
+        f'<div class="index-page">\n'
+        f'  <h2>{title}</h2>\n'
+        f'  <ul class="doc-index">\n{items}\n  </ul>\n'
+        f'</div>\n'
+    )
+
+
+def _figures_index_html(figures):
+    rows = [
+        '<a href="#{}">'
+        '<span class="idx-label">{}</span>{}</a>'.format(
+            fig_id,
+            escape(label),
+            f" — {escape(alt)}" if alt else "",
+        )
+        for label, alt, fig_id in figures
+    ]
+    return _index_page("Índice de figuras", rows)
+
+
+def _tables_index_html(tables):
+    rows = [
+        f'<a href="#{tab_id}"><span class="idx-label">{escape(label)}</span></a>'
+        for label, tab_id in tables
+    ]
+    return _index_page("Índice de tablas", rows)
 
 
 HF_FONT = "SpaceGroteskHF"
