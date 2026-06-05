@@ -122,6 +122,48 @@ Todos son opcionales salvo el título. El orden no importa.
 - Funciona el Markdown habitual: **negrita**, *cursiva*, listas, tablas,
   `código` en línea y bloques con triple acento grave (```` ``` ````), citas.
 
+### Listas
+
+Usa el guion (`-`) como marcador de lista. Es el marcador recomendado porque
+resulta inequívoco frente a otros elementos de la sintaxis Markdown.
+
+```markdown
+- Primer elemento
+- Segundo elemento
+  - Subelemento anidado
+- Tercer elemento
+```
+
+> **No dejes líneas en blanco entre los elementos** de una misma lista:
+> separarlos con líneas vacías produce un espaciado de párrafo entre cada punto.
+
+### Imágenes y tablas
+
+Las imágenes del cuerpo se numeran automáticamente como **Figura x.y** y las
+tablas como **Tabla x.y**, donde *x* es el número de sección (`##`) e *y* el
+índice dentro de esa sección. El contador se reinicia en cada sección nueva.
+
+Ejemplo con dos secciones:
+
+```markdown
+## 1. Introducción
+
+![Diagrama de bloques](bloques.png)
+
+![Esquema de red](red.png)
+
+## 2. Desarrollo
+
+| Columna A | Columna B |
+|-----------|-----------|
+| Dato 1    | Dato 2    |
+```
+
+Produce: *Figura 1.1*, *Figura 1.2* y *Tabla 2.1*.
+
+Las imágenes se centran y su leyenda aparece debajo en cursiva.
+Las tablas muestran su etiqueta encima en cursiva.
+
 ### Logo de portada (opcional)
 
 Si colocas una imagen llamada `logo_uja.webp`, `logo_uja.png`, `logo.webp` o

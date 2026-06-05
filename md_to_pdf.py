@@ -18,6 +18,7 @@ import sys
 import io
 import shutil
 import socket
+import re
 from html import escape
 import markdown
 from markdown.extensions.toc import TocExtension
@@ -225,6 +226,13 @@ blockquote {
     background: #fafafa;
 }
 hr { border: none; margin: 28px 0; }
+ul, ol { margin: 6px 0; padding-left: 2em; }
+li { margin: 0; }
+li > p { margin: 0; padding: 0; }
+figure { margin: 14px auto; text-align: center; page-break-inside: avoid; }
+figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+figcaption { font-size: 11pt; color: #555; margin-top: 5px; font-style: italic; }
+caption { caption-side: top; font-size: 11pt; color: #555; padding-bottom: 6px; font-style: italic; text-align: center; }
 """
 
 DEBUG_PORT = 9333  # por defecto; main() escoge un puerto libre real al arrancar
@@ -355,6 +363,7 @@ def toc_content_html(meta, md_text):
     toc_tree = md.toc
     toc_tokens = md.toc_tokens
 
+    content_body = add_figure_table_numbers(content_body)
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -370,6 +379,39 @@ def toc_content_html(meta, md_text):
 </body>
 </html>"""
     return html, toc_tokens
+
+
+def add_figure_table_numbers(html):
+    """Add Figura x.y / Tabla x.y labels to images and tables, resetting
+    per-section counters on each <h2> (one counter per document section)."""
+    section = [0]
+    figs = [0]
+    tabs = [0]
+    pattern = re.compile(r'<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>')
+
+    def sub(m):
+        tag = m.group(0)
+        lo = tag.lower()
+        if lo.startswith('<h2'):
+            section[0] += 1
+            figs[0] = 0
+            tabs[0] = 0
+            return tag
+        if lo.startswith('<img'):
+            if not section[0]:
+                return tag
+            figs[0] += 1
+            label = f"Figura {section[0]}.{figs[0]}"
+            return f'<figure>{tag}<figcaption>{label}</figcaption></figure>'
+        if lo.startswith('<table'):
+            if not section[0]:
+                return tag
+            tabs[0] += 1
+            label = f"Tabla {section[0]}.{tabs[0]}"
+            return f'{tag}<caption>{label}</caption>'
+        return tag
+
+    return pattern.sub(sub, html)
 
 
 HF_FONT = "SpaceGroteskHF"
