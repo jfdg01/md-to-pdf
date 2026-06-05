@@ -29,6 +29,7 @@ Y la segunda imagen de esta sección:
 
 ### 1.2 Primera tabla de la sección
 
+<!-- caption: Checklist de elementos verificables del PDF -->
 | Elemento        | Estado esperado          | Notas                        |
 |-----------------|--------------------------|------------------------------|
 | Portada         | Título, autor, asignatura| Con logo si existe           |
@@ -95,6 +96,7 @@ generan automáticamente; no es necesario escribirlos a mano.
 
 ### 4.1 Código sin lenguaje
 
+<!-- caption: Ejemplo de uso en línea de comandos -->
 ```
 $ md-to-pdf informe.md
   informe.md → informe.pdf [OK, 142 KB]
@@ -102,6 +104,7 @@ $ md-to-pdf informe.md
 
 ### 4.2 Python con resaltado de sintaxis
 
+<!-- caption: Función de numeración de figuras y tablas -->
 ```python
 def add_figure_table_numbers(html):
     section = [0]
@@ -127,6 +130,7 @@ def add_figure_table_numbers(html):
 
 ### 4.3 Bash
 
+<!-- caption: Script de instalación y primera conversión -->
 ```bash
 # Instalar dependencias y lanzar la conversión
 cd ~/.local/scripts/md-to-pdf
@@ -136,6 +140,7 @@ md-to-pdf documento.md
 
 ### 4.4 JSON
 
+<!-- caption: Parámetros de la llamada Page.printToPDF -->
 ```json
 {
   "id": 1,
@@ -154,6 +159,7 @@ md-to-pdf documento.md
 El siguiente bloque verifica que el conversor maneja correctamente bloques
 de código que superan el límite de una página.
 
+<!-- caption: Módulo CsvAnalyser — estadísticas descriptivas completas -->
 ```python
 """
 Módulo de procesamiento de datos CSV con estadísticas descriptivas.
@@ -353,6 +359,7 @@ class CsvAnalyser:
 
 ### 5.1 Tabla básica
 
+<!-- caption: Parámetros de configuración del conversor -->
 | Nombre   | Tipo     | Valor por defecto |
 |----------|----------|-------------------|
 | `margin` | `float`  | `1.15`            |
@@ -361,6 +368,7 @@ class CsvAnalyser:
 
 ### 5.2 Tabla con alineación
 
+<!-- caption: Demostración de alineación de columnas -->
 | Izquierda    | Centro       | Derecha    |
 |:-------------|:------------:|----------:|
 | texto        | texto        | 1 234,56 € |
@@ -409,6 +417,7 @@ pero dentro del cuerpo produce el `<hr>` habitual.
 Esta sección tiene los dos tipos para verificar que los contadores
 son independientes:
 
+<!-- caption: Tabla de datos de ejemplo con tres columnas -->
 | Columna 1 | Columna 2 | Columna 3 |
 |-----------|-----------|-----------|
 | A1        | B1        | C1        |

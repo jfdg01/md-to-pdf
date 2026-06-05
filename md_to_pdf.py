@@ -435,62 +435,80 @@ def toc_content_html(meta, md_text, md_dir, strings):
 
 def add_figure_table_numbers(html, strings):
     """Returns (processed_html, figures, tables, code_blocks).
-    figures:     [(label, alt_text, anchor_id), ...]
-    tables:      [(label, anchor_id), ...]
-    code_blocks: [(label, anchor_id), ...]
-    All counters reset on each <h2> section.
-    Code blocks are matched as full elements (DOTALL) so inner <pre> tags
-    inside a codehilite div are never double-counted."""
+    All lists contain (num_label, caption, anchor_id) tuples where
+    num_label = "Figura 1.1" and caption = descriptive text (may be "").
+    Captions come from <!-- caption: text --> comments placed immediately
+    before the element; images fall back to alt text when no comment exists.
+    All counters reset on each <h2> section."""
     section = [0]
     figs = [0]
     tabs = [0]
     codes = [0]
+    pending_cap = [""]
     figures = []
     tables = []
     code_blocks = []
     pattern = re.compile(
-        r'<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>'
+        r'<!--\s*caption:\s*(.*?)\s*-->'
+        r'|<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>'
         r'|<div[^>]*\bclass="codehilite"[^>]*>.*?</div>'
         r'|<pre\b[^>]*>.*?</pre>',
         re.DOTALL,
     )
 
+    def _full_label(num_label, caption):
+        return f"{num_label}: {caption}" if caption else num_label
+
     def sub(m):
         tag = m.group(0)
         lo = tag.lower()
+        if lo.startswith('<!--'):
+            cap_m = re.match(r'<!--\s*caption:\s*(.*?)\s*-->', tag, re.DOTALL)
+            pending_cap[0] = cap_m.group(1).strip() if cap_m else ""
+            return ""   # remove comment from output
         if lo.startswith('<h2'):
             section[0] += 1
             figs[0] = 0
             tabs[0] = 0
             codes[0] = 0
+            pending_cap[0] = ""
             return tag
         if lo.startswith('<img'):
             if not section[0]:
                 return tag
             figs[0] += 1
-            label = f"{strings['figure']} {section[0]}.{figs[0]}"
+            num_label = f"{strings['figure']} {section[0]}.{figs[0]}"
             fig_id = f"fig-{section[0]}-{figs[0]}"
             alt_m = re.search(r'\balt="([^"]*)"', tag)
             alt = alt_m.group(1) if alt_m else ""
-            figures.append((label, alt, fig_id))
-            return f'<figure id="{fig_id}">{tag}<figcaption>{label}</figcaption></figure>'
+            caption = pending_cap[0] or alt
+            pending_cap[0] = ""
+            figures.append((num_label, caption, fig_id))
+            rendered = escape(_full_label(num_label, caption))
+            return f'<figure id="{fig_id}">{tag}<figcaption>{rendered}</figcaption></figure>'
         if lo.startswith('<table'):
             if not section[0]:
                 return tag
             tabs[0] += 1
-            label = f"{strings['table']} {section[0]}.{tabs[0]}"
+            num_label = f"{strings['table']} {section[0]}.{tabs[0]}"
             tab_id = f"tab-{section[0]}-{tabs[0]}"
-            tables.append((label, tab_id))
+            caption = pending_cap[0]
+            pending_cap[0] = ""
+            tables.append((num_label, caption, tab_id))
+            rendered = escape(_full_label(num_label, caption))
             new_tag = tag[:-1] + f' id="{tab_id}">'
-            return f'{new_tag}<caption>{label}</caption>'
+            return f'{new_tag}<caption>{rendered}</caption>'
         if lo.startswith('<div') or lo.startswith('<pre'):
             if not section[0]:
                 return tag
             codes[0] += 1
-            label = f"{strings['code_block']} {section[0]}.{codes[0]}"
+            num_label = f"{strings['code_block']} {section[0]}.{codes[0]}"
             code_id = f"code-{section[0]}-{codes[0]}"
-            code_blocks.append((label, code_id))
-            return f'<div class="code-block" id="{code_id}">{tag}<p class="code-label">{label}</p></div>'
+            caption = pending_cap[0]
+            pending_cap[0] = ""
+            code_blocks.append((num_label, caption, code_id))
+            rendered = escape(_full_label(num_label, caption))
+            return f'<div class="code-block" id="{code_id}">{tag}<p class="code-label">{rendered}</p></div>'
         return tag
 
     return pattern.sub(sub, html), figures, tables, code_blocks
@@ -510,29 +528,22 @@ def _all_indices_html(figures, tables, code_blocks, strings):
             f'</div>\n'
         )
 
+    def _row(num_label, caption, anchor_id):
+        cap_html = f": {escape(caption)}" if caption else ""
+        return (
+            f'<a href="#{anchor_id}">'
+            f'<span class="idx-label">{escape(num_label)}</span>{cap_html}</a>'
+        )
+
     parts = []
     if figures:
-        rows = [
-            '<a href="#{}">'
-            '<span class="idx-label">{}</span>{}</a>'.format(
-                fig_id,
-                escape(label),
-                f" — {escape(alt)}" if alt else "",
-            )
-            for label, alt, fig_id in figures
-        ]
+        rows = [_row(nl, cap, aid) for nl, cap, aid in figures]
         parts.append(_block(strings["idx_figures"], rows))
     if tables:
-        rows = [
-            f'<a href="#{tab_id}"><span class="idx-label">{escape(label)}</span></a>'
-            for label, tab_id in tables
-        ]
+        rows = [_row(nl, cap, aid) for nl, cap, aid in tables]
         parts.append(_block(strings["idx_tables"], rows))
     if code_blocks:
-        rows = [
-            f'<a href="#{code_id}"><span class="idx-label">{escape(label)}</span></a>'
-            for label, code_id in code_blocks
-        ]
+        rows = [_row(nl, cap, aid) for nl, cap, aid in code_blocks]
         parts.append(_block(strings["idx_code"], rows))
 
     if not parts:

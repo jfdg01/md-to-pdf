@@ -137,32 +137,45 @@ resulta inequívoco frente a otros elementos de la sintaxis Markdown.
 > **No dejes líneas en blanco entre los elementos** de una misma lista:
 > separarlos con líneas vacías produce un espaciado de párrafo entre cada punto.
 
-### Imágenes y tablas
+### Imágenes, tablas y bloques de código
 
-Las imágenes del cuerpo se numeran automáticamente como **Figura x.y** y las
-tablas como **Tabla x.y**, donde *x* es el número de sección (`##`) e *y* el
-índice dentro de esa sección. El contador se reinicia en cada sección nueva.
+Las imágenes se numeran como **Figura x.y**, las tablas como **Tabla x.y** y
+los bloques de código como **Bloque de código x.y**, donde *x* es la sección
+(`##`) e *y* el índice dentro de ella. Los contadores se reinician en cada
+sección. Cada tipo tiene su propio índice al inicio del documento.
 
-Ejemplo con dos secciones:
+#### Añadir un comentario descriptivo
+
+Escribe un comentario HTML `<!-- caption: texto -->` en la línea inmediatamente
+anterior al elemento. La etiqueta pasará a ser **"Prefijo x.y: texto"** tanto
+debajo del elemento como en el índice correspondiente.
 
 ```markdown
 ## 1. Introducción
 
+<!-- caption: Arquitectura general del sistema -->
 ![Diagrama de bloques](bloques.png)
 
-![Esquema de red](red.png)
+<!-- caption: Comparativa de tiempos de respuesta -->
+| Método  | Tiempo (ms) |
+|---------|-------------|
+| GET     | 12          |
+| POST    | 38          |
+
+<!-- caption: Función principal de arranque -->
+```python
+def main():
+    ...
+` ``
 
 ## 2. Desarrollo
 
-| Columna A | Columna B |
-|-----------|-----------|
-| Dato 1    | Dato 2    |
+![Esquema de red](red.png)
 ```
 
-Produce: *Figura 1.1*, *Figura 1.2* y *Tabla 2.1*.
-
-Las imágenes se centran y su leyenda aparece debajo en cursiva.
-Las tablas muestran su etiqueta encima en cursiva.
+- Las **imágenes** usan el texto alternativo (`![caption](img)`) como descripción si no hay comentario previo.
+- Las **tablas** y **bloques de código** solo muestran el número si no hay `<!-- caption: -->`.
+- El comentario es invisible en cualquier otro visor de Markdown.
 
 ### Logo de portada (opcional)
 
