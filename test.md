@@ -149,6 +149,206 @@ md-to-pdf documento.md
 }
 ```
 
+### 4.5 Bloque de código largo (más de dos páginas)
+
+El siguiente bloque verifica que el conversor maneja correctamente bloques
+de código que superan el límite de una página.
+
+```python
+"""
+Módulo de procesamiento de datos CSV con estadísticas descriptivas.
+Ejemplo extenso utilizado como caso de prueba para la paginación de
+bloques de código en el conversor md-to-pdf.
+"""
+
+from __future__ import annotations
+
+import csv
+import math
+import statistics
+from collections import defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+
+@dataclass
+class ColumnStats:
+    name: str
+    count: int = 0
+    missing: int = 0
+    numeric: bool = True
+    values: List[float] = field(default_factory=list)
+    categories: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+
+    # ── Estadísticos numéricos ──────────────────────────────────────────────
+
+    @property
+    def mean(self) -> Optional[float]:
+        return statistics.mean(self.values) if self.values else None
+
+    @property
+    def median(self) -> Optional[float]:
+        return statistics.median(self.values) if self.values else None
+
+    @property
+    def stdev(self) -> Optional[float]:
+        return statistics.stdev(self.values) if len(self.values) > 1 else None
+
+    @property
+    def minimum(self) -> Optional[float]:
+        return min(self.values) if self.values else None
+
+    @property
+    def maximum(self) -> Optional[float]:
+        return max(self.values) if self.values else None
+
+    @property
+    def q1(self) -> Optional[float]:
+        if not self.values:
+            return None
+        s = sorted(self.values)
+        return statistics.median(s[: len(s) // 2])
+
+    @property
+    def q3(self) -> Optional[float]:
+        if not self.values:
+            return None
+        s = sorted(self.values)
+        mid = (len(s) + 1) // 2
+        return statistics.median(s[mid:])
+
+    @property
+    def iqr(self) -> Optional[float]:
+        q1, q3 = self.q1, self.q3
+        return q3 - q1 if q1 is not None and q3 is not None else None
+
+    def outliers(self, k: float = 1.5) -> List[float]:
+        """Devuelve los valores fuera del rango [Q1 - k·IQR, Q3 + k·IQR]."""
+        iqr = self.iqr
+        if iqr is None:
+            return []
+        lo = self.q1 - k * iqr
+        hi = self.q3 + k * iqr
+        return [v for v in self.values if v < lo or v > hi]
+
+    def histogram(self, bins: int = 10) -> List[Tuple[float, float, int]]:
+        """Devuelve una lista de (límite_inf, límite_sup, frecuencia)."""
+        if not self.values:
+            return []
+        lo, hi = self.minimum, self.maximum
+        if lo == hi:
+            return [(lo, hi, len(self.values))]
+        width = (hi - lo) / bins
+        counts = [0] * bins
+        for v in self.values:
+            idx = min(int((v - lo) / width), bins - 1)
+            counts[idx] += 1
+        return [(lo + i * width, lo + (i + 1) * width, c) for i, c in enumerate(counts)]
+
+    # ── Resumen ─────────────────────────────────────────────────────────────
+
+    def summary(self) -> Dict[str, Any]:
+        if self.numeric:
+            return {
+                "column":  self.name,
+                "type":    "numeric",
+                "count":   self.count,
+                "missing": self.missing,
+                "mean":    round(self.mean, 4) if self.mean is not None else None,
+                "median":  round(self.median, 4) if self.median is not None else None,
+                "stdev":   round(self.stdev, 4) if self.stdev is not None else None,
+                "min":     self.minimum,
+                "q1":      round(self.q1, 4) if self.q1 is not None else None,
+                "q3":      round(self.q3, 4) if self.q3 is not None else None,
+                "max":     self.maximum,
+                "outliers": len(self.outliers()),
+            }
+        top = sorted(self.categories.items(), key=lambda x: -x[1])[:5]
+        return {
+            "column":     self.name,
+            "type":       "categorical",
+            "count":      self.count,
+            "missing":    self.missing,
+            "unique":     len(self.categories),
+            "top_values": top,
+        }
+
+
+class CsvAnalyser:
+    """Lee un CSV y calcula estadísticas descriptivas por columna."""
+
+    def __init__(self, path: str | Path, delimiter: str = ",", encoding: str = "utf-8"):
+        self.path = Path(path)
+        self.delimiter = delimiter
+        self.encoding = encoding
+        self.columns: Dict[str, ColumnStats] = {}
+        self._row_count = 0
+        self._loaded = False
+
+    # ── Carga ────────────────────────────────────────────────────────────────
+
+    def load(self) -> "CsvAnalyser":
+        with self.path.open(encoding=self.encoding, newline="") as fh:
+            reader = csv.DictReader(fh, delimiter=self.delimiter)
+            if reader.fieldnames is None:
+                raise ValueError("El archivo CSV no tiene cabecera.")
+            for name in reader.fieldnames:
+                self.columns[name] = ColumnStats(name=name)
+            for row in reader:
+                self._row_count += 1
+                for name, raw in row.items():
+                    col = self.columns[name]
+                    col.count += 1
+                    if raw is None or raw.strip() == "":
+                        col.missing += 1
+                        continue
+                    try:
+                        col.values.append(float(raw))
+                    except ValueError:
+                        col.numeric = False
+                        col.categories[raw.strip()] += 1
+        self._loaded = True
+        return self
+
+    # ── Consultas ────────────────────────────────────────────────────────────
+
+    @property
+    def row_count(self) -> int:
+        return self._row_count
+
+    def numeric_columns(self) -> List[str]:
+        return [n for n, c in self.columns.items() if c.numeric]
+
+    def categorical_columns(self) -> List[str]:
+        return [n for n, c in self.columns.items() if not c.numeric]
+
+    def correlation(self, col_a: str, col_b: str) -> float:
+        """Coeficiente de correlación de Pearson entre dos columnas numéricas."""
+        a = self.columns[col_a].values
+        b = self.columns[col_b].values
+        n = min(len(a), len(b))
+        if n < 2:
+            return float("nan")
+        mean_a = sum(a[:n]) / n
+        mean_b = sum(b[:n]) / n
+        num = sum((a[i] - mean_a) * (b[i] - mean_b) for i in range(n))
+        den = math.sqrt(
+            sum((a[i] - mean_a) ** 2 for i in range(n))
+            * sum((b[i] - mean_b) ** 2 for i in range(n))
+        )
+        return num / den if den else float("nan")
+
+    def report(self) -> List[Dict[str, Any]]:
+        if not self._loaded:
+            raise RuntimeError("Llama a load() antes de report().")
+        return [col.summary() for col in self.columns.values()]
+
+    def __repr__(self) -> str:
+        status = f"{self._row_count} rows" if self._loaded else "not loaded"
+        return f"CsvAnalyser({self.path.name!r}, {status})"
+```
+
 ## 5. Tablas
 
 ### 5.1 Tabla básica

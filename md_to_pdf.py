@@ -215,7 +215,7 @@ html, body {
 .toc-page .toc li { padding: 5px 0; }
 .toc-page .toc li li { padding-left: 2em; font-size: 12.5pt; font-weight: normal; }
 .toc-page .toc > ul > li { font-size: 13.5pt; font-weight: bold; }
-.toc-page .toc a { text-decoration: none; color: #5a8fc4; }
+.toc-page .toc a { text-decoration: none; color: #1a1a1a; }
 .toc-page .toc a:hover { text-decoration: underline; }
 
 /* ── Contenido ── */
@@ -271,7 +271,7 @@ caption { caption-side: bottom; font-size: 11pt; color: #555; padding-top: 6px; 
 .idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17.5pt; margin-bottom: 16px; }
 .doc-index { list-style: none; margin: 0; padding: 0; }
 .doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 13pt; }
-.doc-index a { text-decoration: none; color: #5a8fc4; }
+.doc-index a { text-decoration: none; color: #1a1a1a; }
 .idx-label { font-weight: bold; min-width: 7em; display: inline-block; }
 """
 
