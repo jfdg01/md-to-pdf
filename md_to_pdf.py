@@ -232,13 +232,17 @@ li > p { margin: 0; padding: 0; }
 figure { margin: 14px auto; text-align: center; page-break-inside: avoid; }
 figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 figcaption { font-size: 11pt; color: #555; margin-top: 5px; font-style: italic; }
-caption { caption-side: top; font-size: 11pt; color: #555; padding-bottom: 6px; font-style: italic; text-align: center; }
-.index-page { page-break-after: always; font-family: 'Source Serif 4', Georgia, serif; }
-.index-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17.5pt; margin-bottom: 20px; }
-.index-page .doc-index { list-style: none; margin: 0; padding: 0; }
-.index-page .doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 13pt; }
-.index-page .doc-index a { text-decoration: none; color: #1a1a1a; }
-.index-page .idx-label { font-weight: bold; min-width: 7em; display: inline-block; }
+caption { caption-side: bottom; font-size: 11pt; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
+.code-block { margin: 12px 0; page-break-inside: avoid; }
+.code-block > pre, .code-block > .codehilite { margin: 0; }
+.code-label { font-size: 11pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
+.indices-section { page-break-after: always; font-family: 'Source Serif 4', Georgia, serif; }
+.idx-block { margin-bottom: 32px; }
+.idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17.5pt; margin-bottom: 16px; }
+.doc-index { list-style: none; margin: 0; padding: 0; }
+.doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 13pt; }
+.doc-index a { text-decoration: none; color: #1a1a1a; }
+.idx-label { font-weight: bold; min-width: 7em; display: inline-block; }
 """
 
 DEBUG_PORT = 9333  # por defecto; main() escoge un puerto libre real al arrancar
@@ -369,9 +373,8 @@ def toc_content_html(meta, md_text):
     toc_tree = md.toc
     toc_tokens = md.toc_tokens
 
-    content_body, figures, tables = add_figure_table_numbers(content_body)
-    fig_idx = _figures_index_html(figures)
-    tab_idx = _tables_index_html(tables)
+    content_body, figures, tables, code_blocks = add_figure_table_numbers(content_body)
+    indices = _all_indices_html(figures, tables, code_blocks)
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -383,23 +386,33 @@ def toc_content_html(meta, md_text):
   <h2>Índice de contenidos</h2>
   {toc_tree}
 </div>
-{fig_idx}{tab_idx}{content_body}
+{indices}{content_body}
 </body>
 </html>"""
     return html, toc_tokens
 
 
 def add_figure_table_numbers(html):
-    """Returns (processed_html, figures, tables).
-    figures: [(label, alt_text, anchor_id), ...]
-    tables:  [(label, anchor_id), ...]
-    Counters reset on each <h2> section."""
+    """Returns (processed_html, figures, tables, code_blocks).
+    figures:     [(label, alt_text, anchor_id), ...]
+    tables:      [(label, anchor_id), ...]
+    code_blocks: [(label, anchor_id), ...]
+    All counters reset on each <h2> section.
+    Code blocks are matched as full elements (DOTALL) so inner <pre> tags
+    inside a codehilite div are never double-counted."""
     section = [0]
     figs = [0]
     tabs = [0]
+    codes = [0]
     figures = []
     tables = []
-    pattern = re.compile(r'<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>')
+    code_blocks = []
+    pattern = re.compile(
+        r'<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>'
+        r'|<div[^>]*\bclass="codehilite"[^>]*>.*?</div>'
+        r'|<pre\b[^>]*>.*?</pre>',
+        re.DOTALL,
+    )
 
     def sub(m):
         tag = m.group(0)
@@ -408,6 +421,7 @@ def add_figure_table_numbers(html):
             section[0] += 1
             figs[0] = 0
             tabs[0] = 0
+            codes[0] = 0
             return tag
         if lo.startswith('<img'):
             if not section[0]:
@@ -428,42 +442,61 @@ def add_figure_table_numbers(html):
             tables.append((label, tab_id))
             new_tag = tag[:-1] + f' id="{tab_id}">'
             return f'{new_tag}<caption>{label}</caption>'
+        if lo.startswith('<div') or lo.startswith('<pre'):
+            if not section[0]:
+                return tag
+            codes[0] += 1
+            label = f"Bloque de código {section[0]}.{codes[0]}"
+            code_id = f"code-{section[0]}-{codes[0]}"
+            code_blocks.append((label, code_id))
+            return f'<div class="code-block" id="{code_id}">{tag}<p class="code-label">{label}</p></div>'
         return tag
 
-    return pattern.sub(sub, html), figures, tables
+    return pattern.sub(sub, html), figures, tables, code_blocks
 
 
-def _index_page(title, rows):
-    if not rows:
-        return ""
-    items = "\n".join(f'    <li>{r}</li>' for r in rows)
-    return (
-        f'<div class="index-page">\n'
-        f'  <h2>{title}</h2>\n'
-        f'  <ul class="doc-index">\n{items}\n  </ul>\n'
-        f'</div>\n'
-    )
+def _all_indices_html(figures, tables, code_blocks):
+    """Build a single indices section containing all non-empty indices.
+    All indices flow together so they share pages when they fit, with a
+    single page-break-after on the wrapping container."""
 
-
-def _figures_index_html(figures):
-    rows = [
-        '<a href="#{}">'
-        '<span class="idx-label">{}</span>{}</a>'.format(
-            fig_id,
-            escape(label),
-            f" — {escape(alt)}" if alt else "",
+    def _block(title, rows):
+        items = "\n".join(f'    <li>{r}</li>' for r in rows)
+        return (
+            f'<div class="idx-block">\n'
+            f'  <h2>{title}</h2>\n'
+            f'  <ul class="doc-index">\n{items}\n  </ul>\n'
+            f'</div>\n'
         )
-        for label, alt, fig_id in figures
-    ]
-    return _index_page("Índice de figuras", rows)
 
+    parts = []
+    if figures:
+        rows = [
+            '<a href="#{}">'
+            '<span class="idx-label">{}</span>{}</a>'.format(
+                fig_id,
+                escape(label),
+                f" — {escape(alt)}" if alt else "",
+            )
+            for label, alt, fig_id in figures
+        ]
+        parts.append(_block("Índice de figuras", rows))
+    if tables:
+        rows = [
+            f'<a href="#{tab_id}"><span class="idx-label">{escape(label)}</span></a>'
+            for label, tab_id in tables
+        ]
+        parts.append(_block("Índice de tablas", rows))
+    if code_blocks:
+        rows = [
+            f'<a href="#{code_id}"><span class="idx-label">{escape(label)}</span></a>'
+            for label, code_id in code_blocks
+        ]
+        parts.append(_block("Índice de bloques de código", rows))
 
-def _tables_index_html(tables):
-    rows = [
-        f'<a href="#{tab_id}"><span class="idx-label">{escape(label)}</span></a>'
-        for label, tab_id in tables
-    ]
-    return _index_page("Índice de tablas", rows)
+    if not parts:
+        return ""
+    return f'<div class="indices-section">\n{"".join(parts)}</div>\n'
 
 
 HF_FONT = "SpaceGroteskHF"
