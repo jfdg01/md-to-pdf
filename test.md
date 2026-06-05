@@ -21,11 +21,11 @@ correctamente.
 
 A continuación se muestra la primera imagen del documento:
 
-![Logo de prueba — sección 1, figura 1](logo_uja.webp)
+![Montaña nevada al amanecer](foto1.jpg)
 
 Y la segunda imagen de esta sección:
 
-![Logo de prueba — sección 1, figura 2](logo_uja.webp)
+![Vista aérea de bosque](foto2.jpg)
 
 ### 1.2 Primera tabla de la sección
 
@@ -173,13 +173,13 @@ md-to-pdf documento.md
 
 Esta imagen recibe la etiqueta **Figura 6.1**:
 
-![Primera imagen de la sección 6](logo_uja.webp)
+![Perro de raza husky en la nieve](foto3.jpg)
 
 ### 6.2 Segunda imagen de la sección
 
 Esta imagen recibe la etiqueta **Figura 6.2**:
 
-![Segunda imagen de la sección 6](logo_uja.webp)
+![Montaña nevada al amanecer](foto1.jpg)
 
 El contador se reinicia en la siguiente sección (`##`), por lo que
 la primera imagen de la sección 7 será *Figura 7.1*.
@@ -214,7 +214,7 @@ son independientes:
 | A1        | B1        | C1        |
 | A2        | B2        | C2        |
 
-![Imagen junto a una tabla en sección 7](logo_uja.webp)
+![Vista aérea de bosque](foto2.jpg)
 
 Los elementos anteriores deben aparecer como **Tabla 7.1** y
 **Figura 7.1** respectivamente.
