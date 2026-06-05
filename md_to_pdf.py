@@ -237,12 +237,15 @@ code {
 pre {
     font-family: 'Space Mono', 'DejaVu Sans Mono', 'Liberation Mono', monospace;
     background: #f4f4f4;
-    border: 1px solid #ddd;
     border-radius: 4px;
     padding: 12px;
     font-size: 10.5pt;
     line-height: 1.4;
-    page-break-inside: avoid;  /* no partir bloques de código entre páginas */
+    page-break-inside: avoid;  /* no partir bloques de código sueltos entre páginas */
+    /* clone: cada fragmento (cada página) repite fondo y padding, de modo que el
+       texto continuado no pega al borde y el zigzag de corte no lo muerde. */
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
 }
 pre code { background: none; padding: 0; }
 table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12pt; page-break-inside: avoid; }
@@ -266,6 +269,11 @@ caption { caption-side: bottom; font-size: 11pt; color: #555; padding-top: 6px; 
 .code-block { margin: 12px 0; page-break-inside: avoid; }
 .code-block > pre, .code-block > .codehilite { margin: 0; }
 .code-label { font-size: 11pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
+/* Anclas invisibles (inicio/fin de cada bloque de código). Sus destinos PDF
+   nos dicen en qué página empieza y acaba cada bloque; si difieren, el bloque
+   se parte y dibujamos el corte en zigzag sobre el borde (ver header_footer_overlay). */
+.cb-anchors { position: absolute; width: 0; height: 0; overflow: hidden; }
+.cb-end { display: inline; }
 .indices-section { page-break-after: always; font-family: 'Source Serif 4', Georgia, serif; }
 .idx-block { margin-bottom: 32px; }
 .idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17.5pt; margin-bottom: 16px; }
@@ -413,6 +421,14 @@ def toc_content_html(meta, md_text, md_dir, strings):
 
     content_body, figures, tables, code_blocks = add_figure_table_numbers(content_body, strings)
     indices = _all_indices_html(figures, tables, code_blocks, strings)
+    code_ids = [cid for _, _, cid in code_blocks]
+    # Enlaces invisibles a las anclas inicio/fin de cada bloque: fuerzan a Chrome
+    # a emitir destinos PDF con nombre para esos ids, que luego leemos (pypdf) para
+    # saber en qué páginas empieza/acaba cada bloque y dónde dibujar el zigzag.
+    anchor_links = "".join(
+        f'<a href="#{cid}"></a><a href="#{cid}-end"></a>' for cid in code_ids
+    )
+    anchors_html = f'<div class="cb-anchors">{anchor_links}</div>' if anchor_links else ""
     lang = meta.get("lang", "es")
     base_uri = md_dir.as_uri() + "/"
     html = f"""<!DOCTYPE html>
@@ -423,14 +439,14 @@ def toc_content_html(meta, md_text, md_dir, strings):
   <style>@page {{ margin: 1.15in 0.85in 0.95in 0.85in; }}{font_face_css()}{CSS}</style>
 </head>
 <body>
-<div class="toc-page">
+{anchors_html}<div class="toc-page">
   <h2>{strings["toc"]}</h2>
   {toc_tree}
 </div>
 {indices}{content_body}
 </body>
 </html>"""
-    return html, toc_tokens
+    return html, toc_tokens, code_ids
 
 
 def add_figure_table_numbers(html, strings):
@@ -508,7 +524,11 @@ def add_figure_table_numbers(html, strings):
             pending_cap[0] = ""
             code_blocks.append((num_label, caption, code_id))
             rendered = escape(_full_label(num_label, caption))
-            return f'<div class="code-block" id="{code_id}">{tag}<p class="code-label">{rendered}</p></div>'
+            return (
+                f'<div class="code-block" id="{code_id}">{tag}'
+                f'<span class="cb-end" id="{code_id}-end"></span>'
+                f'<p class="code-label">{rendered}</p></div>'
+            )
         return tag
 
     return pattern.sub(sub, html), figures, tables, code_blocks
@@ -588,12 +608,69 @@ def _fit_text(text, font, size, max_w):
     return text.rstrip() + ell if text else ell
 
 
-def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69, side_margin=0.85):
-    """Genera un PDF de `num_pages` páginas con la cabecera (título · asignatura)
-    y el pie (autor centrado, 'n / total' a la derecha) para superponer al
-    contenido. Tamaños en pulgadas, igual que printToPDF."""
+def detect_code_cuts(content_bytes, code_ids):
+    """Devuelve {page_index: {'top','bottom'}} indicando en qué páginas de
+    contenido (0-based) un bloque de código queda cortado por un salto de página.
+    Compara el destino PDF del inicio (id) y del fin (id-end) de cada bloque: si
+    están en páginas distintas, el bloque se parte y marcamos los bordes a serrar.
+    Solo usa pypdf (los destinos los emite Chrome por los enlaces ocultos)."""
+    cuts = {}
+    if not code_ids:
+        return cuts
+    reader = pypdf.PdfReader(io.BytesIO(content_bytes))
+    page_of = {}
+    for name, dest in reader.named_destinations.items():
+        try:
+            pno = reader.get_destination_page_number(dest)
+        except Exception:
+            pno = None
+        if pno is not None:
+            page_of[str(name).lstrip("/")] = pno
+    for cid in code_ids:
+        start = page_of.get(cid)
+        end = page_of.get(f"{cid}-end")
+        if start is None or end is None or end <= start:
+            continue
+        for b in range(start, end):
+            cuts.setdefault(b, set()).add("bottom")
+            cuts.setdefault(b + 1, set()).add("top")
+    return cuts
+
+
+def _draw_zigzag(c, x0, x1, y, pointing_down, tooth_w=7.0, tooth_h=4.5):
+    """Dibuja en blanco una banda de dientes a lo largo de [x0,x1] sobre la línea
+    y, para 'rasgar' el borde gris de un bloque de código en su corte de página.
+    pointing_down=True recorta hacia abajo (borde superior de la continuación);
+    False recorta hacia arriba (borde inferior del fragmento que sigue)."""
+    c.saveState()
+    c.setFillColorRGB(1, 1, 1)
+    c.setStrokeColorRGB(1, 1, 1)
+    apex = y - tooth_h if pointing_down else y + tooth_h
+    x = x0
+    while x < x1:
+        p = c.beginPath()
+        p.moveTo(x, y)
+        p.lineTo(min(x + tooth_w / 2, x1), apex)
+        p.lineTo(min(x + tooth_w, x1), y)
+        p.close()
+        c.drawPath(p, fill=1, stroke=0)
+        x += tooth_w
+    c.restoreState()
+
+
+def header_footer_overlay(meta, num_pages, cuts=None, paper_w=8.27, paper_h=11.69,
+                          side_margin=0.85, top_margin=1.15, bottom_margin=0.95):
+    """Genera un PDF de `num_pages` páginas con la cabecera (título · asignatura),
+    el pie (autor centrado, 'n / total' a la derecha) y, si procede, el zigzag de
+    corte de los bloques de código, para superponer al contenido. Tamaños en
+    pulgadas, igual que printToPDF. `cuts` mapea índice de página (0-based) al
+    conjunto de bordes a serrar ({'top','bottom'})."""
     font = register_hf_font()
+    cuts = cuts or {}
     pw, ph = paper_w * inch, paper_h * inch
+    x0, x1 = side_margin * inch, pw - side_margin * inch
+    y_bottom_cut = bottom_margin * inch          # borde inferior del área de contenido
+    y_top_cut = ph - top_margin * inch           # borde superior del área de contenido
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(pw, ph))
     header_text = " · ".join(filter(None, [meta["title"], meta["subject"]]))
@@ -602,6 +679,11 @@ def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69, side_mar
     header_text = _fit_text(header_text, font, 9.5, avail)
     author = _fit_text(author, font, 9.5, avail - 1.2 * inch)  # deja sitio al "n / total"
     for i in range(1, num_pages + 1):
+        page_cuts = cuts.get(i - 1, set())
+        if "bottom" in page_cuts:
+            _draw_zigzag(c, x0, x1, y_bottom_cut, pointing_down=False)
+        if "top" in page_cuts:
+            _draw_zigzag(c, x0, x1, y_top_cut, pointing_down=True)
         c.setFont(font, 9.5)
         c.setFillColorRGB(0.4, 0.4, 0.4)  # ~#666
         if header_text:
@@ -644,17 +726,19 @@ def add_outline(writer, content_bytes, first_content, toc_tokens):
     walk(toc_tokens, None)
 
 
-def assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens=None):
-    """Une portada + contenido, estampa cabecera/pie solo en las páginas de
-    contenido y añade el outline. Usa append() (no add_page) para conservar los
-    enlaces internos del índice; el estampado por merge_page no toca esos destinos."""
+def assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens=None, code_ids=None):
+    """Une portada + contenido, estampa cabecera/pie (y el zigzag de corte de los
+    bloques de código) solo en las páginas de contenido y añade el outline. Usa
+    append() (no add_page) para conservar los enlaces internos del índice; el
+    estampado por merge_page no toca esos destinos."""
     writer = pypdf.PdfWriter()
     writer.append(io.BytesIO(cover_bytes))
     first_content = len(writer.pages)
     writer.append(io.BytesIO(content_bytes))
 
     content_pages = writer.pages[first_content:]
-    overlay = pypdf.PdfReader(header_footer_overlay(meta, len(content_pages)))
+    cuts = detect_code_cuts(content_bytes, code_ids or [])
+    overlay = pypdf.PdfReader(header_footer_overlay(meta, len(content_pages), cuts=cuts))
     for page, ov in zip(content_pages, overlay.pages):
         page.merge_page(ov)
 
@@ -730,13 +814,14 @@ def convert_one(md_path, render):
     strings = get_strings(meta["lang"])
     logo_uri = find_logo(md_path)
 
-    content_html, toc_tokens = toc_content_html(meta, md_text, md_path.resolve().parent, strings)
+    content_html, toc_tokens, code_ids = toc_content_html(
+        meta, md_text, md_path.resolve().parent, strings)
     cover_bytes   = render(cover_html(meta, logo_uri, strings),
                            margin_top=0, margin_bottom=0, margin_lr=0)
     content_bytes = render(content_html,
                            margin_top=1.15, margin_bottom=0.95, margin_lr=0.85)
 
-    pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens)
+    pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens, code_ids)
     pdf_path.write_bytes(pdf_bytes)
     return len(pdf_bytes)
 
