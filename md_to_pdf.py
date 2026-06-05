@@ -41,6 +41,35 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 FONTS_DIR = SCRIPT_DIR / "fonts"
 IS_WINDOWS = sys.platform.startswith("win")
 
+STRINGS = {
+    "es": {
+        "toc":         "Índice de contenidos",
+        "idx_figures": "Índice de figuras",
+        "idx_tables":  "Índice de tablas",
+        "idx_code":    "Índice de bloques de código",
+        "figure":      "Figura",
+        "table":       "Tabla",
+        "code_block":  "Bloque de código",
+        "by":          "Realizado por",
+        "year":        "Curso",
+    },
+    "en": {
+        "toc":         "Table of contents",
+        "idx_figures": "List of figures",
+        "idx_tables":  "List of tables",
+        "idx_code":    "List of code blocks",
+        "figure":      "Figure",
+        "table":       "Table",
+        "code_block":  "Code block",
+        "by":          "By",
+        "year":        "Year",
+    },
+}
+
+
+def get_strings(lang):
+    return STRINGS.get(lang, STRINGS["es"])
+
 
 def find_chrome():
     """Localiza el binario de Chrome/Chromium en Windows o Linux."""
@@ -186,10 +215,11 @@ html, body {
 .toc-page .toc li { padding: 5px 0; }
 .toc-page .toc li li { padding-left: 2em; font-size: 12.5pt; font-weight: normal; }
 .toc-page .toc > ul > li { font-size: 13.5pt; font-weight: bold; }
-.toc-page .toc a { text-decoration: none; color: #1a1a1a; }
+.toc-page .toc a { text-decoration: none; color: #5a8fc4; }
 .toc-page .toc a:hover { text-decoration: underline; }
 
 /* ── Contenido ── */
+a { color: #5a8fc4; }
 h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; }
 h1 { font-size: 23.5pt; margin-bottom: 16px; }
 /* Cada sección de nivel ## empieza en página nueva (salvo la primera, para no
@@ -241,7 +271,7 @@ caption { caption-side: bottom; font-size: 11pt; color: #555; padding-top: 6px; 
 .idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17.5pt; margin-bottom: 16px; }
 .doc-index { list-style: none; margin: 0; padding: 0; }
 .doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 13pt; }
-.doc-index a { text-decoration: none; color: #1a1a1a; }
+.doc-index a { text-decoration: none; color: #5a8fc4; }
 .idx-label { font-weight: bold; min-width: 7em; display: inline-block; }
 """
 
@@ -298,12 +328,14 @@ def cdp_session(ws_url):
 
 
 def extract_meta(md_text):
-    meta = {"title": "", "subject": "", "author": "", "master": "", "curso": ""}
+    meta = {"title": "", "subject": "", "author": "", "master": "", "curso": "", "lang": "es"}
     keys = {
         "**Asignatura:**": "subject",
-        "**Autor:**": "author",
-        "**Máster": "master",
-        "**Curso:**": "curso",
+        "**Autor:**":      "author",
+        "**Máster":        "master",
+        "**Curso:**":      "curso",
+        "**Language:**":   "lang",
+        "**Idioma:**":     "lang",
     }
     for line in md_text.splitlines():
         s = line.strip()
@@ -327,18 +359,22 @@ def find_logo(md_path):
     return None
 
 
-def cover_html(meta, logo_uri):
+def cover_html(meta, logo_uri, strings):
     """Portada standalone — se renderiza sin header/footer. Los metadatos se
     escapan como HTML para que un '&', '<' o '>' en el título/autor no rompa la
     página (el cuerpo ya lo escapa markdown; la cabecera/pie son texto plano)."""
     title   = escape(meta["title"])
     subject = escape(meta["subject"])
     author  = escape(meta["author"])
-    logo_tag = f'<img class="logo" src="{logo_uri}" alt="Logo UJA">' if logo_uri else ""
+    lang    = meta.get("lang", "es")
+    logo_tag = f'<img class="logo" src="{logo_uri}" alt="Logo">' if logo_uri else ""
     master_line = f'<p class="meta-line">{escape(meta["master"])}</p>' if meta["master"] else ""
-    curso_line  = f'<p class="meta-line">Curso {escape(meta["curso"])}</p>' if meta["curso"] else ""
+    curso_line  = (
+        f'<p class="meta-line">{escape(strings["year"])} {escape(meta["curso"])}</p>'
+        if meta["curso"] else ""
+    )
     return f"""<!DOCTYPE html>
-<html lang="es">
+<html lang="{lang}">
 <head>
   <meta charset="utf-8">
   <style>@page {{ margin: 0; }}{font_face_css()}{CSS}</style>
@@ -352,16 +388,18 @@ def cover_html(meta, logo_uri):
     {curso_line}
     {logo_tag}
   </div>
-  <p class="author">Realizado por {author}</p>
+  <p class="author">{escape(strings["by"])} {author}</p>
 </div>
 </body>
 </html>"""
 
 
-def toc_content_html(meta, md_text):
+def toc_content_html(meta, md_text, md_dir, strings):
     """Índice + contenido en un único HTML para que los links anchor funcionen.
     Devuelve (html, toc_tokens); toc_tokens es el árbol de encabezados (nivel,
-    id, nombre, hijos) que usamos para construir el marcador/outline del PDF."""
+    id, nombre, hijos) que usamos para construir el marcador/outline del PDF.
+    md_dir se inyecta como <base href> para que las imágenes con ruta relativa
+    se resuelvan correctamente aunque el HTML se renderice desde /tmp/."""
     parts = md_text.split("\n---\n", 1)
     body_md = parts[1] if len(parts) > 1 else md_text
 
@@ -373,17 +411,20 @@ def toc_content_html(meta, md_text):
     toc_tree = md.toc
     toc_tokens = md.toc_tokens
 
-    content_body, figures, tables, code_blocks = add_figure_table_numbers(content_body)
-    indices = _all_indices_html(figures, tables, code_blocks)
+    content_body, figures, tables, code_blocks = add_figure_table_numbers(content_body, strings)
+    indices = _all_indices_html(figures, tables, code_blocks, strings)
+    lang = meta.get("lang", "es")
+    base_uri = md_dir.as_uri() + "/"
     html = f"""<!DOCTYPE html>
-<html lang="es">
+<html lang="{lang}">
 <head>
   <meta charset="utf-8">
+  <base href="{base_uri}">
   <style>@page {{ margin: 1.15in 0.85in 0.95in 0.85in; }}{font_face_css()}{CSS}</style>
 </head>
 <body>
 <div class="toc-page">
-  <h2>Índice de contenidos</h2>
+  <h2>{strings["toc"]}</h2>
   {toc_tree}
 </div>
 {indices}{content_body}
@@ -392,7 +433,7 @@ def toc_content_html(meta, md_text):
     return html, toc_tokens
 
 
-def add_figure_table_numbers(html):
+def add_figure_table_numbers(html, strings):
     """Returns (processed_html, figures, tables, code_blocks).
     figures:     [(label, alt_text, anchor_id), ...]
     tables:      [(label, anchor_id), ...]
@@ -427,7 +468,7 @@ def add_figure_table_numbers(html):
             if not section[0]:
                 return tag
             figs[0] += 1
-            label = f"Figura {section[0]}.{figs[0]}"
+            label = f"{strings['figure']} {section[0]}.{figs[0]}"
             fig_id = f"fig-{section[0]}-{figs[0]}"
             alt_m = re.search(r'\balt="([^"]*)"', tag)
             alt = alt_m.group(1) if alt_m else ""
@@ -437,7 +478,7 @@ def add_figure_table_numbers(html):
             if not section[0]:
                 return tag
             tabs[0] += 1
-            label = f"Tabla {section[0]}.{tabs[0]}"
+            label = f"{strings['table']} {section[0]}.{tabs[0]}"
             tab_id = f"tab-{section[0]}-{tabs[0]}"
             tables.append((label, tab_id))
             new_tag = tag[:-1] + f' id="{tab_id}">'
@@ -446,7 +487,7 @@ def add_figure_table_numbers(html):
             if not section[0]:
                 return tag
             codes[0] += 1
-            label = f"Bloque de código {section[0]}.{codes[0]}"
+            label = f"{strings['code_block']} {section[0]}.{codes[0]}"
             code_id = f"code-{section[0]}-{codes[0]}"
             code_blocks.append((label, code_id))
             return f'<div class="code-block" id="{code_id}">{tag}<p class="code-label">{label}</p></div>'
@@ -455,7 +496,7 @@ def add_figure_table_numbers(html):
     return pattern.sub(sub, html), figures, tables, code_blocks
 
 
-def _all_indices_html(figures, tables, code_blocks):
+def _all_indices_html(figures, tables, code_blocks, strings):
     """Build a single indices section containing all non-empty indices.
     All indices flow together so they share pages when they fit, with a
     single page-break-after on the wrapping container."""
@@ -480,19 +521,19 @@ def _all_indices_html(figures, tables, code_blocks):
             )
             for label, alt, fig_id in figures
         ]
-        parts.append(_block("Índice de figuras", rows))
+        parts.append(_block(strings["idx_figures"], rows))
     if tables:
         rows = [
             f'<a href="#{tab_id}"><span class="idx-label">{escape(label)}</span></a>'
             for label, tab_id in tables
         ]
-        parts.append(_block("Índice de tablas", rows))
+        parts.append(_block(strings["idx_tables"], rows))
     if code_blocks:
         rows = [
             f'<a href="#{code_id}"><span class="idx-label">{escape(label)}</span></a>'
             for label, code_id in code_blocks
         ]
-        parts.append(_block("Índice de bloques de código", rows))
+        parts.append(_block(strings["idx_code"], rows))
 
     if not parts:
         return ""
@@ -675,10 +716,11 @@ def convert_one(md_path, render):
     pdf_path = md_path.with_suffix(".pdf")
     md_text = md_path.read_text(encoding="utf-8")
     meta = extract_meta(md_text)
+    strings = get_strings(meta["lang"])
     logo_uri = find_logo(md_path)
 
-    content_html, toc_tokens = toc_content_html(meta, md_text)
-    cover_bytes   = render(cover_html(meta, logo_uri),
+    content_html, toc_tokens = toc_content_html(meta, md_text, md_path.resolve().parent, strings)
+    cover_bytes   = render(cover_html(meta, logo_uri, strings),
                            margin_top=0, margin_bottom=0, margin_lr=0)
     content_bytes = render(content_html,
                            margin_top=1.15, margin_bottom=0.95, margin_lr=0.85)
