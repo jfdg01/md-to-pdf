@@ -280,7 +280,7 @@ caption { caption-side: bottom; font-size: 11pt; color: #555; padding-top: 6px; 
 .doc-index { list-style: none; margin: 0; padding: 0; }
 .doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 13pt; }
 .doc-index a { text-decoration: none; color: #1a1a1a; }
-.idx-label { font-weight: bold; min-width: 7em; display: inline-block; }
+.idx-label { font-weight: bold; }
 """
 
 DEBUG_PORT = 9333  # por defecto; main() escoge un puerto libre real al arrancar
