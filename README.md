@@ -122,6 +122,61 @@ Todos son opcionales salvo el título. El orden no importa.
 - Funciona el Markdown habitual: **negrita**, *cursiva*, listas, tablas,
   `código` en línea y bloques con triple acento grave (```` ``` ````), citas.
 
+### Listas
+
+Usa el guion (`-`) como marcador de lista. Es el marcador recomendado porque
+resulta inequívoco frente a otros elementos de la sintaxis Markdown.
+
+```markdown
+- Primer elemento
+- Segundo elemento
+  - Subelemento anidado
+- Tercer elemento
+```
+
+> **No dejes líneas en blanco entre los elementos** de una misma lista:
+> separarlos con líneas vacías produce un espaciado de párrafo entre cada punto.
+
+### Imágenes, tablas y bloques de código
+
+Las imágenes se numeran como **Figura x.y**, las tablas como **Tabla x.y** y
+los bloques de código como **Bloque de código x.y**, donde *x* es la sección
+(`##`) e *y* el índice dentro de ella. Los contadores se reinician en cada
+sección. Cada tipo tiene su propio índice al inicio del documento.
+
+#### Añadir un comentario descriptivo
+
+Escribe un comentario HTML `<!-- caption: texto -->` en la línea inmediatamente
+anterior al elemento. La etiqueta pasará a ser **"Prefijo x.y: texto"** tanto
+debajo del elemento como en el índice correspondiente.
+
+```markdown
+## 1. Introducción
+
+<!-- caption: Arquitectura general del sistema -->
+![Diagrama de bloques](bloques.png)
+
+<!-- caption: Comparativa de tiempos de respuesta -->
+| Método  | Tiempo (ms) |
+|---------|-------------|
+| GET     | 12          |
+| POST    | 38          |
+
+<!-- caption: Función principal de arranque -->
+```python
+def main():
+    ...
+` ``
+
+## 2. Desarrollo
+
+![Esquema de red](red.png)
+```
+
+- Las **imágenes** usan el texto alternativo (`![caption](img)`) como descripción si no hay comentario previo.
+- Las **tablas** y **bloques de código** solo muestran el número si no hay `<!-- caption: -->`.
+- El comentario es invisible en cualquier otro visor de Markdown.
+
 ### Logo de portada (opcional)
 
 Si colocas una imagen llamada `logo_uja.webp`, `logo_uja.png`, `logo.webp` o
