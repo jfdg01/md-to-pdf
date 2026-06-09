@@ -251,6 +251,9 @@ pre code { background: none; padding: 0; }
 table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12pt; page-break-inside: avoid; }
 th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
 th { background: #e8e8e8; font-weight: bold; }
+/* Hace que la primera columna se ajuste a su contenido (evita el hueco excesivo
+   en tablas de índice de figuras/tablas de dos columnas). */
+td:first-child { width: 1%; white-space: nowrap; }
 blockquote {
     border-left: 4px solid #aaa;
     margin: 12px 0;
