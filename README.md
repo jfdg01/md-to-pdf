@@ -108,6 +108,7 @@ Más texto...
 | `author`   | Autor                                                     | Portada + pie     |
 | `logo`     | Ruta a **cualquier** imagen para la portada              | Portada           |
 | `locale`   | `es` (def.) o `en`: idioma de "Figura/Figure", índices…  | Todo el documento |
+| `code_theme`| Paleta de resaltado de código (ver más abajo)           | Bloques de código |
 
 Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`…).
 Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no defines
@@ -165,6 +166,49 @@ def main():
     ...
 ` ``
 ```
+
+### Resaltado de código: paletas y temas
+
+El color del resaltado de sintaxis se controla a **dos niveles**.
+
+**1. Tema de todo el documento — `code_theme` en el front matter.** Acepta:
+
+- *(vacío)* o `custom` → la **paleta cálida personalizada** (marrones suaves y
+  naranjas) definida en `md_to_pdf.py`. Es el valor por defecto.
+- El nombre de **cualquier tema de Pygments**: `monokai`, `dracula`,
+  `github-dark`, `solarized-light`, `solarized-dark`, `nord`, `gruvbox-dark`,
+  `friendly`, `default`… (lista completa: `python -m pygments -L styles`).
+
+```markdown
+---
+title: Mi documento
+code_theme: monokai
+---
+```
+
+Si el nombre no existe, se avisa por consola y se usa la paleta personalizada.
+
+**2. Tema por bloque — `<!-- code-theme: NOMBRE -->`.** Colócalo en la línea
+inmediatamente anterior a la valla ` ``` ` para que **ese bloque concreto** use
+una paleta distinta de la del documento. Así pueden convivir varias paletas en
+un mismo PDF:
+
+```markdown
+<!-- caption: Configuración (tema oscuro) -->
+<!-- code-theme: monokai -->
+` ``json
+{ "printBackground": true }
+` ``
+```
+
+Acepta los mismos valores que `code_theme` (un tema de Pygments o `custom`). Si
+hay también un `<!-- caption: -->`, ponlo **encima** del `<!-- code-theme: -->`.
+
+**Personalizar la paleta cálida.** Edita el diccionario `CODE_PALETTE` cerca del
+principio de `md_to_pdf.py`: cada clave (`keyword`, `string`, `comment`,
+`function`, `number`, `background`…) es un color hex que puedes cambiar a tu
+gusto. Los temas oscuros funcionan porque el `<pre>` interior es transparente y
+el fondo lo pinta el contenedor con el color del tema.
 
 ---
 

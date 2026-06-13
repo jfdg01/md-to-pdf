@@ -19,6 +19,14 @@ from pathlib import Path
 
 import markdown
 from markdown.extensions.toc import TocExtension
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import TextLexer, get_lexer_by_name
+from pygments.style import Style
+from pygments.styles import get_style_by_name
+from pygments.token import (Comment, Error, Generic, Keyword, Name, Number,
+                            Operator, String, Token)
+from pygments.util import ClassNotFound
 import pypdf
 import weasyprint
 
@@ -98,6 +106,102 @@ def font_face_css():
         _face("Space Mono", f"{mono}/SpaceMono-BoldItalic.ttf", 700, "italic"),
     ]
     return "".join(rules)
+
+
+# ─────────────────────── Paleta de resaltado de código ───────────────────────
+# Paleta personalizada editable: cambia estos colores a tu gusto. Se usa cuando
+# el front matter lleva `code_theme: custom` (o no lleva ninguno). Para usar un
+# tema de Pygments ya hecho, pon `code_theme: monokai` (dracula, github-dark,
+# solarized-light, friendly, nord, gruvbox-dark, etc.).
+
+# Gama cálida: marrones suaves y naranjas, sobre un fondo crema tenue.
+CODE_PALETTE = {
+    "background": "#faf6f0",   # fondo del bloque, crema cálido
+    "text":       "#4a3b2f",   # texto por defecto, marrón oscuro
+    "comment":    "#a89580",   # comentarios, marrón claro apagado (cursiva)
+    "keyword":    "#c25d1e",   # palabras clave (def, return, if…), naranja quemado
+    "builtin":    "#b07d2b",   # funciones/constantes integradas, ámbar
+    "name":       "#5a4636",   # identificadores, marrón medio
+    "function":   "#a85420",   # nombres de función/clase, naranja terroso
+    "string":     "#8a6d3b",   # cadenas de texto, tan tostado
+    "number":     "#bf6a1f",   # números, naranja cálido
+    "operator":   "#c25d1e",   # operadores (+, =, ->), naranja quemado
+    "error":      "#b3402a",   # tokens erróneos, rojo-ladrillo
+}
+
+
+def _build_custom_style(palette):
+    """Crea una clase Style de Pygments a partir del dict CODE_PALETTE."""
+    return type("CustomCodeStyle", (Style,), {
+        "background_color": palette["background"],
+        "styles": {
+            Token:          palette["text"],
+            Comment:        f"italic {palette['comment']}",
+            Keyword:        f"bold {palette['keyword']}",
+            Keyword.Constant: palette["builtin"],
+            Name:           palette["name"],
+            Name.Builtin:   palette["builtin"],
+            Name.Function:  palette["function"],
+            Name.Class:     f"bold {palette['function']}",
+            Name.Decorator: palette["function"],
+            String:         palette["string"],
+            Number:         palette["number"],
+            Operator:       palette["operator"],
+            Generic.Error:  palette["error"],
+            Error:          palette["error"],
+        },
+    })
+
+
+CUSTOM_CODE_STYLE = _build_custom_style(CODE_PALETTE)
+
+
+def resolve_code_style(name):
+    """Resuelve el campo `code_theme`: devuelve la clase Style personalizada si
+    está vacío o vale 'custom'; en otro caso, el tema de Pygments con ese nombre.
+    Si el nombre no existe, avisa y cae en la paleta personalizada."""
+    name = (name or "").strip().lower()
+    if name in ("", "custom", "default"):
+        return CUSTOM_CODE_STYLE
+    try:
+        return get_style_by_name(name)
+    except ClassNotFound:
+        print(f"    (aviso: tema de código '{name}' desconocido; uso la paleta "
+              f"personalizada)", file=sys.stderr)
+        return CUSTOM_CODE_STYLE
+
+
+# Bloque con tema propio: un comentario `<!-- code-theme: X -->` en la línea
+# justo encima de la valla ```. Permite que distintos bloques del mismo
+# documento usen paletas distintas, por encima del tema general del documento.
+_THEMED_BLOCK_RE = re.compile(
+    r'<!--\s*code-theme:\s*(?P<theme>[^>]*?)\s*-->[ \t]*\r?\n'
+    r'```[ \t]*(?P<lang>[\w+#.-]*)[ \t]*\r?\n'
+    r'(?P<code>.*?)\r?\n```[ \t]*$',
+    re.DOTALL | re.MULTILINE,
+)
+
+
+def extract_themed_blocks(body_md):
+    """Extrae los bloques marcados con `<!-- code-theme: X -->` y los resalta con
+    ese tema concreto (en lugar del tema general del documento). Los reemplaza
+    por un marcador de texto plano y devuelve (markdown_modificado, {marca: html})
+    para reinyectar el HTML ya resaltado tras la conversión de Markdown."""
+    blocks = {}
+
+    def repl(m):
+        lang = (m.group("lang") or "").strip() or "text"
+        style = resolve_code_style(m.group("theme"))
+        try:
+            lexer = get_lexer_by_name(lang)
+        except ClassNotFound:
+            lexer = TextLexer()
+        formatter = HtmlFormatter(style=style, noclasses=True, cssclass="codehilite")
+        token = f"CODEBLOCKTHEME{len(blocks)}MARKER"
+        blocks[token] = highlight(m.group("code"), lexer, formatter)
+        return f"\n\n{token}\n\n"
+
+    return _THEMED_BLOCK_RE.sub(repl, body_md), blocks
 
 
 # ─────────────────────────── CSS ───────────────────────────
@@ -195,6 +299,12 @@ pre {
     word-wrap: break-word;
 }
 pre code { background: none; padding: 0; }
+/* Bloques resaltados (codehilite con noclasses): el <div> lleva el color de
+   fondo del tema en línea; hacemos que el <pre> interior sea transparente y
+   pasamos el relleno/redondeo al <div>, para que también funcionen los temas
+   oscuros (monokai, dracula…) sin que el fondo gris de `pre` los tape. */
+.codehilite { background: #f4f4f4; border-radius: 4px; padding: 12px; break-inside: avoid; }
+.codehilite pre { background: transparent; padding: 0; margin: 0; border-radius: 0; }
 table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13pt; break-inside: avoid; }
 th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
 th { background: #e8e8e8; font-weight: bold; }
@@ -276,6 +386,9 @@ _META_ALIASES = {
     "author": "author", "autor": "author",
     "logo": "logo", "image": "logo", "imagen": "logo",
     "locale": "lang", "language": "lang", "lang": "lang", "idioma": "lang",
+    "code_theme": "code_theme", "code_style": "code_theme",
+    "codetheme": "code_theme", "tema_codigo": "code_theme",
+    "tema_código": "code_theme",
 }
 
 
@@ -286,7 +399,7 @@ def parse_front_matter(text):
     Si no hay front matter, el cuerpo es el texto entero y el título se toma del
     primer encabezado `# ` (que se elimina del cuerpo para no duplicarlo)."""
     meta = {"title": "", "subtitle": "", "comment": "", "author": "",
-            "logo": "", "lang": "es"}
+            "logo": "", "lang": "es", "code_theme": ""}
     lines = text.splitlines()
     body_start = 0
 
@@ -501,15 +614,21 @@ def cover_html(meta, logo_uri, strings):
 </html>"""
 
 
-def content_html(meta, body_md, strings):
+def content_html(meta, body_md, strings, code_style=CUSTOM_CODE_STYLE):
     """Índice + índices + cuerpo en un único HTML. Lanza ValueError si algún
     elemento carece de descripción (TODO #7)."""
     md = markdown.Markdown(
         extensions=[TocExtension(toc_depth="2-3"), "tables", "fenced_code", "codehilite"],
-        extension_configs={"codehilite": {"noclasses": True, "guess_lang": False}},
+        extension_configs={"codehilite": {
+            "noclasses": True, "guess_lang": False, "pygments_style": code_style}},
     )
+    # Los bloques con tema propio se resaltan aparte y se reinyectan tras la
+    # conversión; el resto usa el tema general (code_style) vía codehilite.
+    body_md, themed_blocks = extract_themed_blocks(body_md)
     body = md.convert(body_md)
     toc_tree = md.toc
+    for token, snippet in themed_blocks.items():
+        body = body.replace(f"<p>{token}</p>", snippet).replace(token, snippet)
 
     body, figures, tables, code_blocks, missing = add_asset_numbers(body, strings)
     if missing:
@@ -569,8 +688,9 @@ def convert_one(md_path):
     strings = get_strings(meta["lang"])
     logo_uri = find_logo(md_path, meta)
     base_url = md_path.resolve().parent.as_uri() + "/"
+    code_style = resolve_code_style(meta.get("code_theme"))
 
-    html = content_html(meta, body_md, strings)
+    html = content_html(meta, body_md, strings, code_style)
     content_pdf = weasyprint.HTML(string=html, base_url=base_url).write_pdf()
     cover_pdf = weasyprint.HTML(
         string=cover_html(meta, logo_uri, strings), base_url=base_url).write_pdf()

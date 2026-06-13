@@ -127,9 +127,13 @@ def add_figure_table_numbers(html):
     return pattern.sub(sub, html)
 ```
 
-### 4.3 Bash
+### 4.3 Bash con tema propio (solarized-light)
 
-<!-- caption: Script de instalación y primera conversión -->
+Este bloque lleva `<!-- code-theme: solarized-light -->` en la línea anterior a
+la valla, de modo que usa esa paleta en lugar del tema cálido del documento.
+
+<!-- caption: Script de instalación (tema solarized-light) -->
+<!-- code-theme: solarized-light -->
 ```bash
 # Instalar dependencias y lanzar la conversión
 cd ~/.local/scripts/md-to-pdf
@@ -137,9 +141,14 @@ bash install.sh
 md-to-pdf documento.md
 ```
 
-### 4.4 JSON
+### 4.4 JSON con tema propio (monokai)
 
-<!-- caption: Parámetros de la llamada Page.printToPDF -->
+Y este otro usa `<!-- code-theme: monokai -->`: un tema oscuro. Compáralo con el
+bloque anterior y con los bloques cálidos por defecto para ver tres paletas
+distintas conviviendo en el mismo documento.
+
+<!-- caption: Parámetros de Page.printToPDF (tema monokai, oscuro) -->
+<!-- code-theme: monokai -->
 ```json
 {
   "id": 1,
@@ -156,8 +165,11 @@ md-to-pdf documento.md
 ### 4.5 Bloque de código largo (más de dos páginas)
 
 El siguiente bloque verifica que el conversor maneja correctamente bloques
-de código que superan el límite de una página.
+de código que superan el límite de una página. Además lleva `<!-- keep -->`,
+de modo que arranca pegado a este párrafo y, al no caber, se reparte entre
+páginas en lugar de empezar en una nueva.
 
+<!-- keep -->
 <!-- caption: Módulo CsvAnalyser — estadísticas descriptivas completas -->
 ```python
 """
