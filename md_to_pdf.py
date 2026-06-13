@@ -1,34 +1,26 @@
 #!/usr/bin/env python3
 """
-MD → PDF via Chrome DevTools Protocol.
-Uso: python3 md_to_pdf.py          (convierte todos los .md del directorio actual)
+MD → PDF, render puro en Python con WeasyPrint (sin navegador).
+
+Uso: python3 md_to_pdf.py                 (convierte todos los .md del directorio)
      python3 md_to_pdf.py f1.md f2.md ...  (convierte los archivos indicados)
 
-Genera un único HTML (portada + índice clickable + contenido) → un PDF.
-Requiere: google-chrome, python-markdown, websocket-client
+Genera, por cada .md, un PDF con portada + índice navegable + índices de
+figuras/tablas/código + cuerpo, con cabecera/pie y marcadores (outline).
+Requiere: weasyprint, python-markdown, pypdf (todo pip, sin Chrome).
 """
-import subprocess
-import time
-import json
 import base64
-import urllib.request
-import tempfile
-import os
-import sys
 import io
-import shutil
-import socket
+import mimetypes
 import re
+import sys
 from html import escape
+from pathlib import Path
+
 import markdown
 from markdown.extensions.toc import TocExtension
-import websocket
 import pypdf
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.units import inch
-from pathlib import Path
+import weasyprint
 
 for _stream in (sys.stdout, sys.stderr):
     try:
@@ -36,10 +28,12 @@ for _stream in (sys.stdout, sys.stderr):
     except (AttributeError, ValueError):
         pass
 
-LOGO_NAMES = ["logo_uja.webp", "logo_uja.png", "logo.webp", "logo.png"]
 SCRIPT_DIR = Path(__file__).resolve().parent
 FONTS_DIR = SCRIPT_DIR / "fonts"
-IS_WINDOWS = sys.platform.startswith("win")
+LOGO_NAMES = ["logo.webp", "logo.png", "logo.jpg", "logo_uja.webp", "logo_uja.png"]
+
+# Tamaño de página A4 en pulgadas y márgenes del cuerpo.
+PAGE_MARGIN = "1.15in 0.85in 0.95in 0.85in"
 
 STRINGS = {
     "es": {
@@ -51,7 +45,6 @@ STRINGS = {
         "table":       "Tabla",
         "code_block":  "Bloque de código",
         "by":          "Realizado por",
-        "year":        "Curso",
     },
     "en": {
         "toc":         "Table of contents",
@@ -62,110 +55,61 @@ STRINGS = {
         "table":       "Table",
         "code_block":  "Code block",
         "by":          "By",
-        "year":        "Year",
     },
 }
 
 
 def get_strings(lang):
-    return STRINGS.get(lang, STRINGS["es"])
+    return STRINGS.get((lang or "es").lower(), STRINGS["es"])
 
 
-def find_chrome():
-    """Localiza el binario de Chrome/Chromium en Windows o Linux."""
-    names = (
-        ["chrome", "chrome.exe"]
-        if IS_WINDOWS
-        else ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"]
+# ─────────────────────────── Fuentes ───────────────────────────
+
+def _face(family, rel, weight, style):
+    path = FONTS_DIR / rel
+    if not path.exists():
+        return ""
+    return (
+        "@font-face {"
+        f"font-family:'{family}';"
+        f"src:url('{path.as_uri()}') format('truetype');"
+        f"font-weight:{weight};font-style:{style};}}\n"
     )
-    for n in names:
-        p = shutil.which(n)
-        if p:
-            return p
-    if IS_WINDOWS:
-        for env in ("ProgramFiles", "ProgramFiles(x86)", "LocalAppData"):
-            base = os.environ.get(env)
-            if base:
-                cand = Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe"
-                if cand.exists():
-                    return str(cand)
-    return None
 
 
 def font_face_css():
-    serif_reg  = FONTS_DIR / "SourceSerif4-VariableFont_opsz,wght.ttf"
-    serif_ita  = FONTS_DIR / "SourceSerif4-Italic-VariableFont_opsz,wght.ttf"
-    grotesk    = FONTS_DIR / "Space_Grotesk" / "SpaceGrotesk-VariableFont_wght.ttf"
-    mono_reg   = FONTS_DIR / "Space_Mono" / "SpaceMono-Regular.ttf"
-    mono_ita   = FONTS_DIR / "Space_Mono" / "SpaceMono-Italic.ttf"
-    mono_bold  = FONTS_DIR / "Space_Mono" / "SpaceMono-Bold.ttf"
-    mono_bita  = FONTS_DIR / "Space_Mono" / "SpaceMono-BoldItalic.ttf"
-    rules = ""
-    if serif_reg.exists():
-        rules += f"""
-@font-face {{
-  font-family: 'Source Serif 4';
-  src: url('{serif_reg.as_uri()}') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-}}"""
-    if serif_ita.exists():
-        rules += f"""
-@font-face {{
-  font-family: 'Source Serif 4';
-  src: url('{serif_ita.as_uri()}') format('truetype');
-  font-weight: 100 900;
-  font-style: italic;
-}}"""
-    if grotesk.exists():
-        rules += f"""
-@font-face {{
-  font-family: 'Space Grotesk';
-  src: url('{grotesk.as_uri()}') format('truetype');
-  font-weight: 300 700;
-  font-style: normal;
-}}"""
-    if mono_reg.exists():
-        rules += f"""
-@font-face {{
-  font-family: 'Space Mono';
-  src: url('{mono_reg.as_uri()}') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-}}"""
-    if mono_ita.exists():
-        rules += f"""
-@font-face {{
-  font-family: 'Space Mono';
-  src: url('{mono_ita.as_uri()}') format('truetype');
-  font-weight: 400;
-  font-style: italic;
-}}"""
-    if mono_bold.exists():
-        rules += f"""
-@font-face {{
-  font-family: 'Space Mono';
-  src: url('{mono_bold.as_uri()}') format('truetype');
-  font-weight: 700;
-  font-style: normal;
-}}"""
-    if mono_bita.exists():
-        rules += f"""
-@font-face {{
-  font-family: 'Space Mono';
-  src: url('{mono_bita.as_uri()}') format('truetype');
-  font-weight: 700;
-  font-style: italic;
-}}"""
-    return rules
+    """Fuentes embebidas (estáticas, para evitar rarezas con variables en
+    WeasyPrint). WeasyPrint sí respeta @font-face también en la cabecera/pie,
+    así que ya no hace falta estampar nada por separado."""
+    serif = "Source_Serif_4/static"
+    grot = "Space_Grotesk/static"
+    mono = "Space_Mono"
+    rules = [
+        _face("Source Serif 4", f"{serif}/SourceSerif4-Regular.ttf", 400, "normal"),
+        _face("Source Serif 4", f"{serif}/SourceSerif4-Italic.ttf", 400, "italic"),
+        _face("Source Serif 4", f"{serif}/SourceSerif4-Bold.ttf", 700, "normal"),
+        _face("Source Serif 4", f"{serif}/SourceSerif4-BoldItalic.ttf", 700, "italic"),
+        _face("Space Grotesk", f"{grot}/SpaceGrotesk-Regular.ttf", 400, "normal"),
+        _face("Space Grotesk", f"{grot}/SpaceGrotesk-Medium.ttf", 500, "normal"),
+        _face("Space Grotesk", f"{grot}/SpaceGrotesk-Bold.ttf", 700, "normal"),
+        _face("Space Mono", f"{mono}/SpaceMono-Regular.ttf", 400, "normal"),
+        _face("Space Mono", f"{mono}/SpaceMono-Italic.ttf", 400, "italic"),
+        _face("Space Mono", f"{mono}/SpaceMono-Bold.ttf", 700, "normal"),
+        _face("Space Mono", f"{mono}/SpaceMono-BoldItalic.ttf", 700, "italic"),
+    ]
+    return "".join(rules)
 
 
-CSS = """
+# ─────────────────────────── CSS ───────────────────────────
+# Tamaños subidos +1 pt respecto a la versión anterior (TODO #5), salvo la
+# cabecera/pie, que se mantienen a 9.5 pt.
+
+BASE_CSS = """
 html, body {
     margin: 0;
     padding: 0;
     font-family: 'Source Serif 4', Georgia, serif;
-    font-size: 13pt;
+    font-size: 14pt;
     line-height: 1.6;
     color: #1a1a1a;
 }
@@ -175,13 +119,11 @@ html, body {
     height: 100vh;
     box-sizing: border-box;
     padding: 2.5cm 2cm;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
     text-align: center;
-    font-family: 'Source Serif 4', Georgia, serif;
 }
 .cover .top {
     flex: 1;
@@ -192,64 +134,70 @@ html, body {
 }
 .cover h1 {
     font-family: 'Space Grotesk', Arial, sans-serif;
-    font-size: 26pt;
+    font-size: 27pt;
     font-weight: bold;
     border: none;
     margin: 0 0 20px 0;
     line-height: 1.3;
 }
-.cover .subtitle   { font-size: 15.5pt; font-style: italic; color: #444; margin: 0 0 6px 0; }
-.cover .meta-line  { font-size: 12pt; color: #555; margin: 3px 0; }
-.cover .logo       { width: 180px; height: 180px; object-fit: contain; margin: 40px 0; }
-.cover .author     { font-size: 13pt; font-style: italic; color: #333; padding-bottom: 1cm; }
+.cover .subtitle  { font-size: 16.5pt; font-style: italic; color: #444; margin: 0 0 6px 0; }
+.cover .meta-line { font-size: 13pt; color: #555; margin: 3px 0; }
+.cover .logo      { max-width: 180px; max-height: 180px; object-fit: contain; margin: 40px 0; }
+.cover .author    { font-size: 14pt; font-style: italic; color: #333; padding-bottom: 1cm; }
 
-/* ── Índice ── */
-.toc-page { page-break-after: always; font-family: 'Source Serif 4', Georgia, serif; }
-.toc-page h2 {
-    font-family: 'Space Grotesk', Arial, sans-serif;
-    font-size: 17.5pt;
-    margin-bottom: 20px;
-}
+/* ── Índice de contenidos ── */
+.toc-page { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
+.toc-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18.5pt; margin-bottom: 20px; }
+/* La fuente del índice (TODO #1): forzar la serif del documento en todos los
+   elementos del árbol del TOC, evitando que herede una fuente del sistema. */
+.toc-page .toc, .toc-page .toc * { font-family: 'Source Serif 4', Georgia, serif; }
 .toc-page .toc { margin: 0; padding: 0; }
 .toc-page .toc ul { list-style: none; margin: 0; padding: 0; }
 .toc-page .toc li { padding: 5px 0; }
-.toc-page .toc li li { padding-left: 2em; font-size: 12.5pt; font-weight: normal; }
-.toc-page .toc > ul > li { font-size: 13.5pt; font-weight: bold; }
+.toc-page .toc li li { padding-left: 2em; font-size: 13.5pt; font-weight: normal; }
+.toc-page .toc > ul > li { font-size: 14.5pt; font-weight: bold; }
 .toc-page .toc a { text-decoration: none; color: #1a1a1a; }
-.toc-page .toc a:hover { text-decoration: underline; }
+
+/* ── Índices de figuras/tablas/código ── */
+.indices-section { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
+.idx-block { margin-bottom: 32px; }
+.idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18.5pt; margin-bottom: 16px; }
+.doc-index { list-style: none; margin: 0; padding: 0; }
+.doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 14pt; }
+.doc-index a { text-decoration: none; color: #1a1a1a; }
+.idx-label { font-weight: bold; }
 
 /* ── Contenido ── */
 a { color: #5a8fc4; }
 h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; }
-h1 { font-size: 23.5pt; margin-bottom: 16px; }
-/* Cada sección de nivel ## empieza en página nueva (salvo la primera, para no
-   dejar una página en blanco tras el índice). Las subsecciones ### no rompen. */
-h2:not(:first-of-type) { page-break-before: always; }
-h2 { font-size: 17.5pt; margin-top: 28px; }
-h3 { font-size: 14pt; margin-top: 20px; color: #222; }
+h1 { font-size: 24.5pt; margin-bottom: 16px; }
+/* Cada sección de nivel ## empieza en página nueva. El salto forzado tras el
+   índice y este se fusionan, así que no aparece una página en blanco. */
+.body h2 { break-before: page; }
+h2 { font-size: 18.5pt; margin-top: 28px; }
+h3 { font-size: 15pt; margin-top: 20px; color: #222; }
 code {
-    font-family: 'Space Mono', 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+    font-family: 'Space Mono', 'DejaVu Sans Mono', monospace;
     background: #f4f4f4;
     padding: 1px 4px;
     border-radius: 3px;
-    font-size: 11pt;
+    font-size: 12pt;
 }
 pre {
-    font-family: 'Space Mono', 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+    font-family: 'Space Mono', 'DejaVu Sans Mono', monospace;
     background: #f4f4f4;
     border-radius: 4px;
     padding: 12px;
-    font-size: 10.5pt;
+    font-size: 11.5pt;
     line-height: 1.4;
-    page-break-inside: avoid;
+    break-inside: avoid;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 pre code { background: none; padding: 0; }
-table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12pt; page-break-inside: avoid; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13pt; break-inside: avoid; }
 th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
 th { background: #e8e8e8; font-weight: bold; }
-/* Hace que la primera columna se ajuste a su contenido (evita el hueco excesivo
-   en tablas de índice de figuras/tablas de dos columnas). */
-td:first-child { width: 1%; white-space: nowrap; }
 blockquote {
     border-left: 4px solid #aaa;
     margin: 12px 0;
@@ -257,199 +205,155 @@ blockquote {
     color: #555;
     background: #fafafa;
 }
-hr { border: none; margin: 28px 0; }
+hr { border: none; border-top: 1px solid #ccc; margin: 28px 0; }
 ul, ol { margin: 6px 0; padding-left: 2em; }
 li { margin: 0; }
 li > p { margin: 0; padding: 0; }
-figure { margin: 14px auto; text-align: center; page-break-inside: avoid; }
+figure { margin: 14px auto; text-align: center; break-inside: avoid; }
 figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-figcaption { font-size: 11pt; color: #555; margin-top: 5px; font-style: italic; }
-caption { caption-side: bottom; font-size: 11pt; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
-.code-block { margin: 12px 0; page-break-inside: avoid; }
+figcaption { font-size: 12pt; color: #555; margin-top: 5px; font-style: italic; }
+caption { caption-side: bottom; font-size: 12pt; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
+.code-block { margin: 12px 0; break-inside: avoid; }
 .code-block > pre, .code-block > .codehilite { margin: 0; }
-.code-label { font-size: 11pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
-.indices-section { page-break-after: always; font-family: 'Source Serif 4', Georgia, serif; }
-.idx-block { margin-bottom: 32px; }
-.idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17.5pt; margin-bottom: 16px; }
-.doc-index { list-style: none; margin: 0; padding: 0; }
-.doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 13pt; }
-.doc-index a { text-decoration: none; color: #1a1a1a; }
-.idx-label { font-weight: bold; }
+.code-label { font-size: 12pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
+
+/* ── Mantener junto al elemento anterior (TODO #6) ──
+   Evita el salto de página *antes* del elemento y permite que el propio
+   elemento se parta si no cabe, de modo que quede pegado al texto previo. */
+.keep-with-prev { break-before: avoid; break-inside: auto; }
+
+/* Outline del PDF: solo las secciones del cuerpo, no la portada ni los índices. */
+h1, h2, h3, h4, h5, h6 { bookmark-level: none; }
+.body h2 { bookmark-level: 1; }
+.body h3 { bookmark-level: 2; }
 """
 
-DEBUG_PORT = 9333  # por defecto; main() escoge un puerto libre real al arrancar
+
+def _css_str(s):
+    """Escapa una cadena para incrustarla en un valor `content:` de CSS."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _free_port():
-    """Pide al SO un puerto TCP libre para el remote-debugging de Chrome (evita
-    choques si quedó un Chrome colgado en un puerto fijo o si se lanzan dos
-    conversiones a la vez)."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+def page_css(meta, strings):
+    """@page del cuerpo: márgenes + cabecera (título · subtítulo) y pie
+    (autor centrado, 'n / total' a la derecha). El texto se incrusta como
+    cadenas CSS; los recuadros de margen recortan lo que sobre."""
+    header = " · ".join(filter(None, [meta.get("title", ""), meta.get("subtitle", "")]))
+    author = meta.get("author", "")
+    top = (f'content: "{_css_str(header)}";' if header else "content: none;")
+    bottom = (f'content: "{_css_str(author)}";' if author else "content: none;")
+    return f"""
+@page {{
+    size: A4;
+    margin: {PAGE_MARGIN};
+    @top-center {{
+        {top}
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        font-size: 9.5pt; color: #666;
+        white-space: nowrap; overflow: hidden;
+    }}
+    @bottom-center {{
+        {bottom}
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        font-size: 9.5pt; color: #666;
+        white-space: nowrap; overflow: hidden;
+    }}
+    @bottom-right {{
+        content: counter(page) " / " counter(pages);
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        font-size: 9.5pt; color: #666;
+    }}
+}}
+"""
 
 
-def wait_for_chrome(timeout=10):
-    for _ in range(timeout * 10):
-        try:
-            urllib.request.urlopen(f"http://localhost:{DEBUG_PORT}/json", timeout=1)
-            return True
-        except Exception:
-            time.sleep(0.1)
-    return False
+# ─────────────────────── Front matter / metadatos ───────────────────────
+
+_META_ALIASES = {
+    "title": "title", "titulo": "title", "título": "title",
+    "subtitle": "subtitle", "subtitulo": "subtitle", "subtítulo": "subtitle",
+    "comment": "comment", "comentario": "comment",
+    "author": "author", "autor": "author",
+    "logo": "logo", "image": "logo", "imagen": "logo",
+    "locale": "lang", "language": "lang", "lang": "lang", "idioma": "lang",
+}
 
 
-def cdp_session(ws_url):
-    ws = websocket.WebSocket()
-    ws.connect(ws_url, timeout=10)
-    _id = [0]
+def parse_front_matter(text):
+    """Lee un bloque de front matter YAML simple (`clave: valor`) delimitado por
+    líneas `---` al principio del fichero (TODO #4). Devuelve (meta, body).
 
-    def send(method, params=None):
-        _id[0] += 1
-        ws.send(json.dumps({"id": _id[0], "method": method, "params": params or {}}))
-        while True:
-            msg = json.loads(ws.recv())
-            if msg.get("id") == _id[0]:
-                if "error" in msg:
-                    raise RuntimeError(f"CDP error: {msg['error']}")
-                return msg
+    Si no hay front matter, el cuerpo es el texto entero y el título se toma del
+    primer encabezado `# ` (que se elimina del cuerpo para no duplicarlo)."""
+    meta = {"title": "", "subtitle": "", "comment": "", "author": "",
+            "logo": "", "lang": "es"}
+    lines = text.splitlines()
+    body_start = 0
 
-    def wait_event(event_name, timeout=10):
-        ws.settimeout(timeout)
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            try:
-                msg = json.loads(ws.recv())
-                if msg.get("method") == event_name:
-                    return msg
-            except websocket.WebSocketTimeoutException:
+    if lines and lines[0].strip() == "---":
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---":
+                for raw in lines[1:i]:
+                    if ":" not in raw:
+                        continue
+                    key, val = raw.split(":", 1)
+                    canon = _META_ALIASES.get(key.strip().lower())
+                    if canon:
+                        meta[canon] = val.strip().strip('"').strip("'").strip()
+                body_start = i + 1
                 break
-        ws.settimeout(None)
 
-    return ws, send, wait_event
+    body_lines = lines[body_start:]
 
+    if not meta["title"]:
+        for idx, line in enumerate(body_lines):
+            if line.startswith("# "):
+                meta["title"] = line[2:].strip()
+                del body_lines[idx]
+                break
 
-def extract_meta(md_text):
-    meta = {"title": "", "subject": "", "author": "", "master": "", "curso": "", "lang": "es"}
-    keys = {
-        "**Asignatura:**": "subject",
-        "**Autor:**":      "author",
-        "**Máster":        "master",
-        "**Curso:**":      "curso",
-        "**Language:**":   "lang",
-        "**Idioma:**":     "lang",
-    }
-    for line in md_text.splitlines():
-        s = line.strip()
-        if not meta["title"] and line.startswith("# "):
-            meta["title"] = line[2:].strip()
-        for prefix, key in keys.items():
-            if not meta[key] and s.startswith(prefix):
-                meta[key] = s.split(":**", 1)[-1].strip().strip("*").strip()
-    return meta
+    return meta, "\n".join(body_lines)
 
 
-def find_logo(md_path):
-    for name in LOGO_NAMES:
-        for d in (md_path.parent, SCRIPT_DIR):
-            logo = d / name
-            if logo.exists():
-                data = logo.read_bytes()
-                ext = logo.suffix.lstrip(".")
-                mime = "image/webp" if ext == "webp" else f"image/{ext}"
-                return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+def find_logo(md_path, meta):
+    """Resuelve el logo/imagen de portada a un data URI. Prioriza el campo
+    `logo:` del front matter (ruta arbitraria, TODO #3); si no, autodetecta
+    un fichero logo.* junto al .md o al script. `logo: none` lo desactiva."""
+    candidates = []
+    logo_field = (meta.get("logo") or "").strip()
+    if logo_field.lower() in ("none", "no", "false"):
+        return None
+    if logo_field:
+        p = Path(logo_field)
+        candidates = [p if p.is_absolute() else md_path.parent / p]
+    else:
+        for name in LOGO_NAMES:
+            candidates += [md_path.parent / name, SCRIPT_DIR / name]
+
+    for logo in candidates:
+        if logo.exists():
+            data = logo.read_bytes()
+            mime = mimetypes.guess_type(logo.name)[0] or "image/png"
+            return f"data:{mime};base64,{base64.b64encode(data).decode()}"
     return None
 
 
-def cover_html(meta, logo_uri, strings):
-    """Portada standalone — se renderiza sin header/footer. Los metadatos se
-    escapan como HTML para que un '&', '<' o '>' en el título/autor no rompa la
-    página (el cuerpo ya lo escapa markdown; la cabecera/pie son texto plano)."""
-    title   = escape(meta["title"])
-    subject = escape(meta["subject"])
-    author  = escape(meta["author"])
-    lang    = meta.get("lang", "es")
-    logo_tag = f'<img class="logo" src="{logo_uri}" alt="Logo">' if logo_uri else ""
-    master_line = f'<p class="meta-line">{escape(meta["master"])}</p>' if meta["master"] else ""
-    curso_line  = (
-        f'<p class="meta-line">{escape(strings["year"])} {escape(meta["curso"])}</p>'
-        if meta["curso"] else ""
-    )
-    return f"""<!DOCTYPE html>
-<html lang="{lang}">
-<head>
-  <meta charset="utf-8">
-  <style>@page {{ margin: 0; }}{font_face_css()}{CSS}</style>
-</head>
-<body>
-<div class="cover">
-  <div class="top">
-    <h1>{title}</h1>
-    <p class="subtitle">{subject}</p>
-    {master_line}
-    {curso_line}
-    {logo_tag}
-  </div>
-  <p class="author">{escape(strings["by"])} {author}</p>
-</div>
-</body>
-</html>"""
+# ─────────────────────── Numeración de figuras/tablas/código ───────────────────────
 
+def add_asset_numbers(html, strings):
+    """Numera figuras, tablas y bloques de código (x.y, reiniciando en cada
+    `<h2>`), añade su etiqueta y recoge los datos para los índices.
 
-def toc_content_html(meta, md_text, md_dir, strings):
-    """Índice + contenido en un único HTML para que los links anchor funcionen.
-    Devuelve (html, toc_tokens); toc_tokens es el árbol de encabezados (nivel,
-    id, nombre, hijos) que usamos para construir el marcador/outline del PDF.
-    md_dir se inyecta como <base href> para que las imágenes con ruta relativa
-    se resuelvan correctamente aunque el HTML se renderice desde /tmp/."""
-    parts = md_text.split("\n---\n", 1)
-    body_md = parts[1] if len(parts) > 1 else md_text
-
-    md = markdown.Markdown(
-        extensions=[TocExtension(toc_depth="2-3"), "tables", "fenced_code", "codehilite"],
-        extension_configs={"codehilite": {"noclasses": True, "guess_lang": False}},
-    )
-    content_body = md.convert(body_md)
-    toc_tree = md.toc
-    toc_tokens = md.toc_tokens
-
-    content_body, figures, tables, code_blocks = add_figure_table_numbers(content_body, strings)
-    indices = _all_indices_html(figures, tables, code_blocks, strings)
-    lang = meta.get("lang", "es")
-    base_uri = md_dir.as_uri() + "/"
-    html = f"""<!DOCTYPE html>
-<html lang="{lang}">
-<head>
-  <meta charset="utf-8">
-  <base href="{base_uri}">
-  <style>@page {{ margin: 1.15in 0.85in 0.95in 0.85in; }}{font_face_css()}{CSS}</style>
-</head>
-<body>
-<div class="toc-page">
-  <h2>{strings["toc"]}</h2>
-  {toc_tree}
-</div>
-{indices}{content_body}
-</body>
-</html>"""
-    return html, toc_tokens
-
-
-def add_figure_table_numbers(html, strings):
-    """Returns (processed_html, figures, tables, code_blocks).
-    All lists contain (num_label, caption, anchor_id) tuples where
-    num_label = "Figura 1.1" and caption = descriptive text (may be "").
-    Captions come from <!-- caption: text --> comments placed immediately
-    before the element; images fall back to alt text when no comment exists.
-    All counters reset on each <h2> section."""
+    Devuelve (html, figures, tables, code_blocks, missing). `missing` lista las
+    etiquetas de los elementos SIN descripción: la imagen usa su `alt`; tablas y
+    bloques de código requieren `<!-- caption: -->`. Si `missing` no está vacío,
+    el llamador rechaza generar el PDF (TODO #7)."""
     section = [0]
     figs = [0]
     tabs = [0]
     codes = [0]
     pending_cap = [""]
-    figures = []
-    tables = []
-    code_blocks = []
+    figures, tables, code_blocks, missing = [], [], [], []
     pattern = re.compile(
         r'<!--\s*caption:\s*(.*?)\s*-->'
         r'|<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>'
@@ -467,12 +371,10 @@ def add_figure_table_numbers(html, strings):
         if lo.startswith('<!--'):
             cap_m = re.match(r'<!--\s*caption:\s*(.*?)\s*-->', tag, re.DOTALL)
             pending_cap[0] = cap_m.group(1).strip() if cap_m else ""
-            return ""   # remove comment from output
+            return ""   # quita el comentario de la salida
         if lo.startswith('<h2'):
             section[0] += 1
-            figs[0] = 0
-            tabs[0] = 0
-            codes[0] = 0
+            figs[0] = tabs[0] = codes[0] = 0
             pending_cap[0] = ""
             return tag
         if lo.startswith('<img'):
@@ -485,6 +387,8 @@ def add_figure_table_numbers(html, strings):
             alt = alt_m.group(1) if alt_m else ""
             caption = pending_cap[0] or alt
             pending_cap[0] = ""
+            if not caption:
+                missing.append(num_label)
             figures.append((num_label, caption, fig_id))
             rendered = escape(_full_label(num_label, caption))
             return f'<figure id="{fig_id}">{tag}<figcaption>{rendered}</figcaption></figure>'
@@ -496,10 +400,11 @@ def add_figure_table_numbers(html, strings):
             tab_id = f"tab-{section[0]}-{tabs[0]}"
             caption = pending_cap[0]
             pending_cap[0] = ""
+            if not caption:
+                missing.append(num_label)
             tables.append((num_label, caption, tab_id))
             rendered = escape(_full_label(num_label, caption))
-            new_tag = tag[:-1] + f' id="{tab_id}">'
-            return f'{new_tag}<caption>{rendered}</caption>'
+            return tag[:-1] + f' id="{tab_id}"><caption>{rendered}</caption>'
         if lo.startswith('<div') or lo.startswith('<pre'):
             if not section[0]:
                 return tag
@@ -508,6 +413,8 @@ def add_figure_table_numbers(html, strings):
             code_id = f"code-{section[0]}-{codes[0]}"
             caption = pending_cap[0]
             pending_cap[0] = ""
+            if not caption:
+                missing.append(num_label)
             code_blocks.append((num_label, caption, code_id))
             rendered = escape(_full_label(num_label, caption))
             return (
@@ -516,167 +423,132 @@ def add_figure_table_numbers(html, strings):
             )
         return tag
 
-    return pattern.sub(sub, html), figures, tables, code_blocks
+    return pattern.sub(sub, html), figures, tables, code_blocks, missing
 
 
-def _all_indices_html(figures, tables, code_blocks, strings):
-    """Build a single indices section containing all non-empty indices.
-    All indices flow together so they share pages when they fit, with a
-    single page-break-after on the wrapping container."""
+def apply_keep_with_prev(html):
+    """Aplica la marca `<!-- keep -->` (TODO #6): añade la clase keep-with-prev
+    al siguiente elemento de bloque, forzándolo a quedarse en la misma página
+    que el contenido anterior. Se ejecuta tras la numeración, para que la marca
+    afecte al envoltorio <figure>/<div class="code-block"> ya creado."""
+    def inject(tag):
+        cm = re.search(r'class="([^"]*)"', tag)
+        if cm:
+            return tag[:cm.start(1)] + (cm.group(1) + " keep-with-prev") + tag[cm.end(1):]
+        return re.sub(r'^(<\w+)', r'\1 class="keep-with-prev"', tag, count=1)
 
+    pattern = re.compile(
+        r'<!--\s*keep(?:-with-(?:prev|previous))?\s*-->\s*(<[A-Za-z][^>]*>)',
+        re.DOTALL,
+    )
+    return pattern.sub(lambda m: inject(m.group(1)), html)
+
+
+def _indices_html(figures, tables, code_blocks, strings):
+    """Construye la sección de índices (figuras/tablas/código) no vacíos."""
     def _block(title, rows):
         items = "\n".join(f'    <li>{r}</li>' for r in rows)
         return (
-            f'<div class="idx-block">\n'
-            f'  <h2>{title}</h2>\n'
-            f'  <ul class="doc-index">\n{items}\n  </ul>\n'
-            f'</div>\n'
+            f'<div class="idx-block">\n  <h2>{title}</h2>\n'
+            f'  <ul class="doc-index">\n{items}\n  </ul>\n</div>\n'
         )
 
     def _row(num_label, caption, anchor_id):
-        cap_html = f": {escape(caption)}" if caption else ""
-        return (
-            f'<a href="#{anchor_id}">'
-            f'<span class="idx-label">{escape(num_label)}</span>{cap_html}</a>'
-        )
+        cap = f": {escape(caption)}" if caption else ""
+        return (f'<a href="#{anchor_id}">'
+                f'<span class="idx-label">{escape(num_label)}</span>{cap}</a>')
 
     parts = []
-    if figures:
-        rows = [_row(nl, cap, aid) for nl, cap, aid in figures]
-        parts.append(_block(strings["idx_figures"], rows))
-    if tables:
-        rows = [_row(nl, cap, aid) for nl, cap, aid in tables]
-        parts.append(_block(strings["idx_tables"], rows))
-    if code_blocks:
-        rows = [_row(nl, cap, aid) for nl, cap, aid in code_blocks]
-        parts.append(_block(strings["idx_code"], rows))
-
+    for items, key in ((figures, "idx_figures"), (tables, "idx_tables"),
+                       (code_blocks, "idx_code")):
+        if items:
+            rows = [_row(nl, cap, aid) for nl, cap, aid in items]
+            parts.append(_block(strings[key], rows))
     if not parts:
         return ""
     return f'<div class="indices-section">\n{"".join(parts)}</div>\n'
 
 
-HF_FONT = "SpaceGroteskHF"
-_hf_font_ready = None
+# ─────────────────────────── HTML (portada y contenido) ───────────────────────────
+
+def cover_html(meta, logo_uri, strings):
+    title = escape(meta["title"])
+    subtitle = escape(meta["subtitle"])
+    comment = escape(meta["comment"])
+    author = escape(meta["author"])
+    lang = meta.get("lang", "es")
+    logo_tag = f'<img class="logo" src="{logo_uri}" alt="">' if logo_uri else ""
+    subtitle_tag = f'<p class="subtitle">{subtitle}</p>' if subtitle else ""
+    comment_tag = f'<p class="meta-line">{comment}</p>' if comment else ""
+    author_tag = (f'<p class="author">{escape(strings["by"])} {author}</p>'
+                  if author else "")
+    return f"""<!DOCTYPE html>
+<html lang="{lang}">
+<head><meta charset="utf-8">
+<style>@page {{ size: A4; margin: 0; }}{font_face_css()}{BASE_CSS}</style>
+</head>
+<body>
+<div class="cover">
+  <div class="top">
+    <h1>{title}</h1>
+    {subtitle_tag}
+    {comment_tag}
+    {logo_tag}
+  </div>
+  {author_tag}
+</div>
+</body>
+</html>"""
 
 
-def register_hf_font():
-    """Registra Space Grotesk en reportlab para dibujar cabecera/pie. Chrome
-    renderiza su cabecera/pie en un contexto aislado que ignora @font-face y solo
-    usa fuentes del sistema (distinto en Windows y Linux), así que en su lugar las
-    pintamos nosotros como una capa PDF con la fuente embebida: idéntico en ambos
-    sistemas y sin instalar nada. Devuelve el nombre de fuente a usar."""
-    global _hf_font_ready
-    if _hf_font_ready is not None:
-        return _hf_font_ready
-    for cand in (
-        FONTS_DIR / "Space_Grotesk" / "static" / "SpaceGrotesk-Medium.ttf",
-        FONTS_DIR / "Space_Grotesk" / "static" / "SpaceGrotesk-Regular.ttf",
-        FONTS_DIR / "Space_Grotesk" / "SpaceGrotesk-VariableFont_wght.ttf",
-    ):
-        if cand.exists():
-            pdfmetrics.registerFont(TTFont(HF_FONT, str(cand)))
-            _hf_font_ready = HF_FONT
-            return HF_FONT
-    _hf_font_ready = "Helvetica"  # respaldo si faltara la fuente
-    return _hf_font_ready
+def content_html(meta, body_md, strings):
+    """Índice + índices + cuerpo en un único HTML. Lanza ValueError si algún
+    elemento carece de descripción (TODO #7)."""
+    md = markdown.Markdown(
+        extensions=[TocExtension(toc_depth="2-3"), "tables", "fenced_code", "codehilite"],
+        extension_configs={"codehilite": {"noclasses": True, "guess_lang": False}},
+    )
+    body = md.convert(body_md)
+    toc_tree = md.toc
+
+    body, figures, tables, code_blocks, missing = add_asset_numbers(body, strings)
+    if missing:
+        raise ValueError(
+            "elementos sin descripción (añade <!-- caption: ... --> o un alt): "
+            + ", ".join(missing)
+        )
+    body = apply_keep_with_prev(body)
+    indices = _indices_html(figures, tables, code_blocks, strings)
+    lang = meta.get("lang", "es")
+
+    return f"""<!DOCTYPE html>
+<html lang="{lang}">
+<head><meta charset="utf-8">
+<style>{page_css(meta, strings)}{font_face_css()}{BASE_CSS}</style>
+</head>
+<body>
+<div class="toc-page">
+  <h2>{strings["toc"]}</h2>
+  {toc_tree}
+</div>
+{indices}<main class="body">{body}</main>
+</body>
+</html>"""
 
 
-def _fit_text(text, font, size, max_w):
-    """Recorta `text` con una elipsis si su anchura supera `max_w` puntos, para
-    que la cabecera/pie no se salgan de los márgenes con títulos largos."""
-    if not text or pdfmetrics.stringWidth(text, font, size) <= max_w:
-        return text
-    ell = "…"
-    while text and pdfmetrics.stringWidth(text + ell, font, size) > max_w:
-        text = text[:-1]
-    return text.rstrip() + ell if text else ell
+# ─────────────────────────── Ensamblado ───────────────────────────
 
-
-
-def header_footer_overlay(meta, num_pages, paper_w=8.27, paper_h=11.69,
-                          side_margin=0.85, top_margin=1.15, bottom_margin=0.95):
-    """Genera un PDF de `num_pages` páginas con la cabecera (título · asignatura)
-    y el pie (autor centrado, 'n / total' a la derecha) para superponer al
-    contenido. Tamaños en pulgadas, igual que printToPDF."""
-    font = register_hf_font()
-    pw, ph = paper_w * inch, paper_h * inch
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=(pw, ph))
-    header_text = " · ".join(filter(None, [meta["title"], meta["subject"]]))
-    author = meta["author"]
-    avail = pw - 2 * side_margin * inch
-    header_text = _fit_text(header_text, font, 9.5, avail)
-    author = _fit_text(author, font, 9.5, avail - 1.2 * inch)  # deja sitio al "n / total"
-    for i in range(1, num_pages + 1):
-        c.setFont(font, 9.5)
-        c.setFillColorRGB(0.4, 0.4, 0.4)  # ~#666
-        if header_text:
-            c.drawCentredString(pw / 2, ph - 0.75 * inch, header_text)
-        if author:
-            c.drawCentredString(pw / 2, 0.55 * inch, author)
-        c.drawRightString(pw - side_margin * inch, 0.55 * inch, f"{i} / {num_pages}")
-        c.showPage()
-    c.save()
-    buf.seek(0)
-    return buf
-
-
-def add_outline(writer, content_bytes, first_content, toc_tokens):
-    """Crea el outline (marcadores) del PDF a partir del árbol de encabezados,
-    mapeando cada id a su página vía los destinos con nombre del contenido. Así
-    el visor muestra la estructura del documento en su panel lateral."""
-    if not toc_tokens:
-        return
-    reader = pypdf.PdfReader(io.BytesIO(content_bytes))
-    id_to_page = {}
-    for name, dest in reader.named_destinations.items():
-        try:
-            pno = reader.get_destination_page_number(dest)
-        except Exception:
-            pno = None
-        if pno is not None:
-            id_to_page[str(name).lstrip("/")] = first_content + pno
-
-    def walk(tokens, parent):
-        for t in tokens:
-            title = (t.get("name") or t.get("id") or "").strip()
-            page = id_to_page.get(t.get("id", ""))
-            if title and page is not None:
-                item = writer.add_outline_item(title, page, parent=parent)
-            else:
-                item = parent  # sin destino: cuelga los hijos del nivel actual
-            walk(t.get("children", []), item)
-
-    walk(toc_tokens, None)
-
-
-def assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens=None):
-    """Une portada + contenido, estampa cabecera/pie solo en las páginas de
-    contenido y añade el outline. Usa append() (no add_page) para conservar los
-    enlaces internos del índice; el estampado por merge_page no toca esos destinos."""
+def merge_pdfs(cover_bytes, content_bytes, meta):
+    """Antepone la portada al contenido conservando outline y enlaces internos
+    (pypdf reajusta las páginas), y escribe los metadatos del documento."""
     writer = pypdf.PdfWriter()
     writer.append(io.BytesIO(cover_bytes))
-    first_content = len(writer.pages)
     writer.append(io.BytesIO(content_bytes))
-
-    content_pages = writer.pages[first_content:]
-    overlay = pypdf.PdfReader(header_footer_overlay(meta, len(content_pages)))
-    for page, ov in zip(content_pages, overlay.pages):
-        page.merge_page(ov)
-
-    # merge_page deja objetos repetidos por página; deduplicar recorta algo el PDF.
-    try:
-        writer.compress_identical_objects()
-    except Exception:
-        pass
-
-    add_outline(writer, content_bytes, first_content, toc_tokens)
 
     info = {tag: val for tag, val in (
         ("/Title", meta.get("title")),
         ("/Author", meta.get("author")),
-        ("/Subject", meta.get("subject")),
+        ("/Subject", meta.get("subtitle")),
     ) if val}
     if info:
         try:
@@ -689,69 +561,26 @@ def assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens=None):
     return out.getvalue()
 
 
-def make_render(send, wait_event):
-    """Devuelve la función que renderiza un HTML a PDF vía Chrome (printToPDF).
-    Se crea una sola vez por sesión, no por archivo."""
-    def render(html, *, margin_top, margin_bottom, margin_lr):
-        # La cabecera/pie ya no las dibuja Chrome (las estampamos después con
-        # reportlab), pero dejamos márgenes arriba/abajo para que entren.
-        with tempfile.NamedTemporaryFile(suffix=".html", mode="w", encoding="utf-8", delete=False) as f:
-            f.write(html)
-            tmp = f.name
-        try:
-            send("Page.enable", {})
-            send("Page.navigate", {"url": Path(tmp).resolve().as_uri()})
-            wait_event("Page.loadEventFired", timeout=10)
-            # Esperar a que las webfonts estén listas (en vez de un sleep fijo):
-            # evita carreras de carga de fuentes que daban fallbacks erróneos.
-            try:
-                send("Runtime.evaluate", {
-                    "expression": "document.fonts.ready.then(() => true)",
-                    "awaitPromise": True,
-                    "returnByValue": True,
-                })
-            except Exception:
-                time.sleep(0.3)
-            time.sleep(0.1)  # pequeño margen para el reflow tras aplicar fuentes
-            result = send("Page.printToPDF", {
-                "printBackground": True,
-                "displayHeaderFooter": False,
-                "marginTop": margin_top,
-                "marginBottom": margin_bottom,
-                "marginLeft": margin_lr,
-                "marginRight": margin_lr,
-                "paperWidth": 8.27,
-                "paperHeight": 11.69,
-            })
-            return base64.b64decode(result["result"]["data"])
-        finally:
-            os.unlink(tmp)
-    return render
-
-
-def convert_one(md_path, render):
+def convert_one(md_path):
     """Convierte un único .md a .pdf junto a él. Lanza excepción si algo falla."""
     pdf_path = md_path.with_suffix(".pdf")
     md_text = md_path.read_text(encoding="utf-8")
-    meta = extract_meta(md_text)
+    meta, body_md = parse_front_matter(md_text)
     strings = get_strings(meta["lang"])
-    logo_uri = find_logo(md_path)
+    logo_uri = find_logo(md_path, meta)
+    base_url = md_path.resolve().parent.as_uri() + "/"
 
-    content_html, toc_tokens = toc_content_html(
-        meta, md_text, md_path.resolve().parent, strings)
-    cover_bytes   = render(cover_html(meta, logo_uri, strings),
-                           margin_top=0, margin_bottom=0, margin_lr=0)
-    content_bytes = render(content_html,
-                           margin_top=1.15, margin_bottom=0.95, margin_lr=0.85)
+    html = content_html(meta, body_md, strings)
+    content_pdf = weasyprint.HTML(string=html, base_url=base_url).write_pdf()
+    cover_pdf = weasyprint.HTML(
+        string=cover_html(meta, logo_uri, strings), base_url=base_url).write_pdf()
 
-    pdf_bytes = assemble_pdf(cover_bytes, content_bytes, meta, toc_tokens)
+    pdf_bytes = merge_pdfs(cover_pdf, content_pdf, meta)
     pdf_path.write_bytes(pdf_bytes)
     return len(pdf_bytes)
 
 
 def main():
-    global DEBUG_PORT
-
     if len(sys.argv) > 1:
         md_files = [Path(p) for p in sys.argv[1:]]
     else:
@@ -761,57 +590,16 @@ def main():
         print("No hay archivos .md")
         sys.exit(1)
 
-    chrome_bin = find_chrome()
-    if not chrome_bin:
-        print("No se encontró Chrome/Chromium. Instálalo o añádelo al PATH.")
-        sys.exit(1)
-
-    DEBUG_PORT = _free_port()
-    chrome = subprocess.Popen(
-        [
-            chrome_bin,
-            "--headless=new",
-            "--disable-gpu",
-            "--no-sandbox",
-            f"--remote-debugging-port={DEBUG_PORT}",
-            "--remote-allow-origins=*",
-            "--disable-extensions",
-            "--disable-features=site-per-process",
-            "about:blank",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env=os.environ,
-    )
-
-    if not wait_for_chrome():
-        print("Chrome no arrancó a tiempo")
-        chrome.terminate()
-        sys.exit(1)
-
     failures = 0
-    try:
-        targets = json.loads(
-            urllib.request.urlopen(f"http://localhost:{DEBUG_PORT}/json").read()
-        )
-        page_target = next(t for t in targets if t["type"] == "page")
-        ws, send, wait_event = cdp_session(page_target["webSocketDebuggerUrl"])
-        render = make_render(send, wait_event)
-
-        for md_path in md_files:
-            pdf_path = md_path.with_suffix(".pdf")
-            print(f"  {md_path.name} → {pdf_path.name}", end=" ", flush=True)
-            try:
-                kb = convert_one(md_path, render) // 1024
-                print(f"[OK, {kb} KB]")
-            except Exception as e:
-                failures += 1
-                print(f"[ERROR: {e}]")
-
-        ws.close()
-    finally:
-        chrome.terminate()
-        chrome.wait()
+    for md_path in md_files:
+        pdf_path = md_path.with_suffix(".pdf")
+        print(f"  {md_path.name} → {pdf_path.name}", end=" ", flush=True)
+        try:
+            kb = convert_one(md_path) // 1024
+            print(f"[OK, {kb} KB]")
+        except Exception as e:
+            failures += 1
+            print(f"[ERROR: {e}]")
 
     if failures:
         sys.exit(1)

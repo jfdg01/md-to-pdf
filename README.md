@@ -1,23 +1,26 @@
 # md-to-pdf
 
-Convierte ficheros Markdown en un PDF con **portada**, **índice navegable** y
-**cabecera/pie** en cada página. Pensado para trabajos y memorias académicas.
+Convierte ficheros Markdown en un PDF con **portada**, **índice navegable**,
+**índices de figuras/tablas/código** y **cabecera/pie** en cada página. Sirve para
+informes, manuales, apuntes o cualquier documento estructurado.
 
-El render lo hace **Google Chrome** en modo headless (vía CDP), así que el
-resultado es idéntico a imprimir desde el navegador. Las fuentes (Source Serif 4,
-Space Grotesk, Space Mono) viajan con el repositorio en `fonts/`.
+El render lo hace **WeasyPrint** (Python puro, sin navegador): rápido, ligero y
+con el mismo resultado en cualquier máquina. Las fuentes (Source Serif 4, Space
+Grotesk, Space Mono) viajan con el repositorio en `fonts/`.
 
 ---
 
 ## Requisitos
 
 - **Python 3** (3.10+).
-- **Google Chrome** o **Chromium** instalado.
-  - Linux: `google-chrome` / `chromium` en el `PATH`.
-  - Windows: Chrome en la ruta habitual de *Program Files* (se detecta solo).
+- Las librerías de sistema de WeasyPrint (Pango/Cairo). En Ubuntu/Debian:
+  ```bash
+  sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0
+  ```
+  En Windows se instalan con WeasyPrint según su documentación (GTK runtime).
 
-Las dependencias de Python (`markdown`, `websocket-client`, `pypdf`, `reportlab`)
-se instalan en un entorno virtual propio (`.venv/`) por el script de instalación.
+Las dependencias de Python (`markdown`, `weasyprint`, `pypdf`) se instalan en un
+entorno virtual propio (`.venv/`) por el script de instalación.
 
 ---
 
@@ -39,14 +42,14 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ### Windows
 ```powershell
-cd $env:USERPROFILE\Documents\Universidad\md-to-pdf   # ruta del repo
+cd $env:USERPROFILE\Documents\md-to-pdf   # ruta del repo
 .\install.ps1
 ```
 Añade la carpeta del repo al `PATH` de usuario. **Abre una terminal nueva** para
 que el comando `md-to-pdf` quede disponible.
 
-> El `.venv/` es propio de cada máquina (Windows y Linux no son compatibles) y
-> está en `.gitignore`. Ejecuta el instalador una vez por equipo tras clonar.
+> El `.venv/` es propio de cada máquina y está en `.gitignore`. Ejecuta el
+> instalador una vez por equipo tras clonar.
 
 ---
 
@@ -69,19 +72,17 @@ Cada PDF se escribe junto a su `.md` de origen, con el mismo nombre.
 
 ## Cómo estructurar el Markdown
 
-El documento tiene **dos partes** separadas por una línea `---`:
-
-1. **Bloque de portada** (antes del `---`): el título y los metadatos.
-2. **Cuerpo** (después del `---`): el contenido que se paginará.
+El documento empieza con un bloque de **front matter** (metadatos `clave: valor`
+entre líneas `---`), seguido del **cuerpo**:
 
 ```markdown
-# Título del trabajo
-
-**Asignatura:** Nombre de la asignatura
-**Máster en Ciberseguridad**
-**Curso:** 2025/2026
-**Autor:** Tu Nombre Completo
-
+---
+title: Título del documento
+subtitle: Un subtítulo opcional
+comment: Una línea libre (fecha, curso, nota…)
+author: Tu Nombre
+logo: imagenes/portada.png
+locale: es
 ---
 
 ## 1. Introducción
@@ -97,102 +98,82 @@ Más texto...
 ...
 ```
 
-### Metadatos reconocidos (bloque de portada)
+### Metadatos del front matter
 
-| Campo            | Cómo se escribe                       | Dónde aparece                |
-|------------------|---------------------------------------|------------------------------|
-| Título           | `# Título` (primer encabezado `#`)    | Portada + cabecera de página |
-| Asignatura       | `**Asignatura:** ...`                 | Portada + cabecera de página |
-| Máster           | `**Máster ...**` (línea en negrita)   | Portada                      |
-| Curso            | `**Curso:** 2025/2026`                | Portada ("Curso 2025/2026")  |
-| Autor            | `**Autor:** Nombre`                   | Portada + pie de página      |
+| Clave      | Para qué sirve                                            | Aparece en        |
+|------------|----------------------------------------------------------|-------------------|
+| `title`    | Título del documento (único obligatorio)                 | Portada + cabecera|
+| `subtitle` | Subtítulo en cursiva                                      | Portada + cabecera|
+| `comment`  | Línea libre adicional (fecha, curso, nota…)              | Portada           |
+| `author`   | Autor                                                     | Portada + pie     |
+| `logo`     | Ruta a **cualquier** imagen para la portada              | Portada           |
+| `locale`   | `es` (def.) o `en`: idioma de "Figura/Figure", índices…  | Todo el documento |
 
-Todos son opcionales salvo el título. El orden no importa.
+Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`…).
+Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no defines
+`logo` pero existe un `logo.*` junto al `.md`, se usa automáticamente; con
+`logo: none` lo desactivas.
 
 ### Reglas del cuerpo
 
-- **`## ` = sección.** Cada encabezado de nivel 2 empieza en una **página
-  nueva** (la primera no, para no dejar un hueco tras el índice). Numéralas
-  `## 1. ...`, `## 2. ...` si quieres numeración.
+- **`## ` = sección.** Cada encabezado de nivel 2 empieza en una **página nueva**.
+  Numéralas `## 1. ...`, `## 2. ...` si quieres numeración.
 - **`### ` = subsección.** No fuerza salto de página.
-- **El índice** lista automáticamente los `##` y `###`, con enlaces que saltan
-  a la sección correspondiente al hacer clic.
-- **El PDF incluye un outline/marcadores** con la misma jerarquía de secciones,
-  que el visor muestra en su panel lateral para navegar el documento.
-- Funciona el Markdown habitual: **negrita**, *cursiva*, listas, tablas,
-  `código` en línea y bloques con triple acento grave (```` ``` ````), citas.
+- **El índice** lista automáticamente los `##` y `###`, con enlaces que saltan a
+  la sección al hacer clic, y el PDF incluye **marcadores** con esa jerarquía.
+- Funciona el Markdown habitual: **negrita**, *cursiva*, listas, tablas, `código`
+  en línea y bloques con triple acento grave, citas.
 
 ### Listas
 
-Usa el guion (`-`) como marcador de lista. Es el marcador recomendado porque
-resulta inequívoco frente a otros elementos de la sintaxis Markdown.
-
-```markdown
-- Primer elemento
-- Segundo elemento
-  - Subelemento anidado
-- Tercer elemento
-```
-
-> **No dejes líneas en blanco entre los elementos** de una misma lista:
-> separarlos con líneas vacías produce un espaciado de párrafo entre cada punto.
+Usa el guion (`-`) como marcador y **no dejes líneas en blanco entre los
+elementos** de una misma lista (eso produce espaciado de párrafo entre puntos).
 
 ### Imágenes, tablas y bloques de código
 
-Las imágenes se numeran como **Figura x.y**, las tablas como **Tabla x.y** y
-los bloques de código como **Bloque de código x.y**, donde *x* es la sección
-(`##`) e *y* el índice dentro de ella. Los contadores se reinician en cada
-sección. Cada tipo tiene su propio índice al inicio del documento.
+Se numeran como **Figura x.y**, **Tabla x.y** y **Bloque de código x.y**, donde
+*x* es la sección (`##`) e *y* el índice dentro de ella (los contadores se
+reinician en cada sección). Cada tipo tiene su propio índice al inicio.
 
-#### Añadir un comentario descriptivo
-
-Escribe un comentario HTML `<!-- caption: texto -->` en la línea inmediatamente
-anterior al elemento. La etiqueta pasará a ser **"Prefijo x.y: texto"** tanto
-debajo del elemento como en el índice correspondiente.
+**Toda figura, tabla y bloque de código debe llevar descripción**, o el conversor
+se niega a generar el PDF (evita "Tabla x.y" vacías). La descripción se escribe
+con un comentario HTML en la línea inmediatamente anterior:
 
 ```markdown
-## 1. Introducción
-
 <!-- caption: Arquitectura general del sistema -->
 ![Diagrama de bloques](bloques.png)
+```
 
-<!-- caption: Comparativa de tiempos de respuesta -->
-| Método  | Tiempo (ms) |
-|---------|-------------|
-| GET     | 12          |
-| POST    | 38          |
+- Las **imágenes** pueden usar su texto alternativo (`![texto](img)`) como
+  descripción si no hay `<!-- caption: -->`.
+- El comentario es invisible en cualquier otro visor de Markdown.
 
-<!-- caption: Función principal de arranque -->
-```python
+### Mantener un elemento junto al anterior
+
+Coloca `<!-- keep -->` en la línea anterior a un elemento para forzarlo a quedarse
+en la misma página que el contenido previo (en lugar de empujarlo a la siguiente).
+Si no cabe entero, el propio elemento se parte. Útil para que un bloque de código
+no se separe del texto que lo introduce.
+
+```markdown
+Como muestra la siguiente función:
+
+<!-- keep -->
+<!-- caption: Función principal -->
+` ``python
 def main():
     ...
 ` ``
-
-## 2. Desarrollo
-
-![Esquema de red](red.png)
 ```
-
-- Las **imágenes** usan el texto alternativo (`![caption](img)`) como descripción si no hay comentario previo.
-- Las **tablas** y **bloques de código** solo muestran el número si no hay `<!-- caption: -->`.
-- El comentario es invisible en cualquier otro visor de Markdown.
-
-### Logo de portada (opcional)
-
-Si colocas una imagen llamada `logo_uja.webp`, `logo_uja.png`, `logo.webp` o
-`logo.png` junto al `.md` (o junto al script), se incrusta centrada en la
-portada.
 
 ---
 
 ## Notas
 
-- Cabecera y pie se dibujan como una capa PDF con la fuente (Space Grotesk)
-  embebida, así que se ven igual en Windows y Linux sin instalar nada. El cuerpo
-  usa también las fuentes incrustadas en `fonts/` en ambos sistemas. Si el título
-  es muy largo, la cabecera se recorta con «…» para no salirse del margen.
-- El PDF lleva metadatos de documento (título, autor y asignatura), visibles en
-  las propiedades del visor.
+- Cabecera, pie, portada y cuerpo usan las fuentes incrustadas en `fonts/`, así
+  que el resultado es idéntico en cualquier sistema sin instalar nada. Si el
+  título es muy largo, la cabecera se recorta para no salirse del margen.
+- El PDF lleva metadatos de documento (título, autor y subtítulo).
 - Al convertir varios ficheros, si uno falla se informa con `[ERROR: …]` y se
   continúa con el resto; el comando termina con código distinto de cero si hubo
   algún fallo.

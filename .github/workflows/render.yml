@@ -17,8 +17,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0
           pip install -r requirements.txt
-          sudo apt-get install -y chromium-browser
 
       - name: Convert test.md to PDF
         run: python3 md_to_pdf.py test.md

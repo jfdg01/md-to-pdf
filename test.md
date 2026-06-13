@@ -1,10 +1,9 @@
-# Documento de prueba integral
-
-**Asignatura:** Verificación del conversor
-**Máster en Desarrollo de Software**
-**Curso:** 2025/2026
-**Autor:** Usuario de Prueba
-
+---
+title: Documento de prueba integral
+subtitle: Verificación del conversor
+comment: Curso 2025/2026
+author: Usuario de Prueba
+locale: es
 ---
 
 ## 1. Introducción
