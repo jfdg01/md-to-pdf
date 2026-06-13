@@ -329,8 +329,15 @@ caption { caption-side: bottom; font-size: 12pt; color: #555; padding-top: 6px; 
 
 /* ── Mantener junto al elemento anterior (TODO #6) ──
    Evita el salto de página *antes* del elemento y permite que el propio
-   elemento se parta si no cabe, de modo que quede pegado al texto previo. */
-.keep-with-prev { break-before: avoid; break-inside: auto; }
+   elemento se parta si no cabe, de modo que quede pegado al texto previo.
+   El `break-inside: auto` debe alcanzar también al `.codehilite`/`pre`
+   interior: si no, un bloque más alto que una página deja la marca de "no
+   romper dentro" intacta, vuelve irresoluble el "pegar al anterior" y
+   WeasyPrint empuja el bloque hacia abajo dejando un hueco enorme. */
+.keep-with-prev { break-before: avoid; }
+.keep-with-prev,
+.keep-with-prev .codehilite,
+.keep-with-prev pre { break-inside: auto; }
 
 /* Outline del PDF: solo las secciones del cuerpo, no la portada ni los índices. */
 h1, h2, h3, h4, h5, h6 { bookmark-level: none; }
