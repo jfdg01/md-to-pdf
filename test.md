@@ -354,6 +354,21 @@ class CsvAnalyser:
         return f"CsvAnalyser({self.path.name!r}, {status})"
 ```
 
+### 4.6 Bloque mantenido junto al texto previo
+
+El marcador `<!-- keep -->` (en la línea anterior al elemento) fuerza a este a
+permanecer en la misma página que el contenido precedente, en lugar de empujarlo
+a la página siguiente. El siguiente bloque de código debe quedar pegado a este
+párrafo:
+
+<!-- keep -->
+<!-- caption: Bloque forzado a seguir al párrafo anterior -->
+```python
+def keep_example():
+    """Este bloque se mantiene junto al texto que lo introduce."""
+    return "permanece junto al párrafo previo"
+```
+
 ## 5. Tablas
 
 ### 5.1 Tabla básica
