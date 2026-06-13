@@ -130,7 +130,7 @@ def add_figure_table_numbers(html):
 ### 4.3 Bash con tema propio (solarized-light)
 
 Este bloque lleva `<!-- code-theme: solarized-light -->` en la línea anterior a
-la valla, de modo que usa esa paleta en lugar del tema cálido del documento.
+la valla, de modo que usa esa paleta en lugar del tema oscuro por defecto del documento.
 
 <!-- caption: Script de instalación (tema solarized-light) -->
 <!-- code-theme: solarized-light -->
@@ -144,7 +144,7 @@ md-to-pdf documento.md
 ### 4.4 JSON con tema propio (monokai)
 
 Y este otro usa `<!-- code-theme: monokai -->`: un tema oscuro. Compáralo con el
-bloque anterior y con los bloques cálidos por defecto para ver tres paletas
+bloque anterior y con los bloques oscuros por defecto para ver tres paletas
 distintas conviviendo en el mismo documento.
 
 <!-- caption: Parámetros de Page.printToPDF (tema monokai, oscuro) -->

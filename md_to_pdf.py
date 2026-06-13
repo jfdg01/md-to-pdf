@@ -25,7 +25,7 @@ from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.style import Style
 from pygments.styles import get_style_by_name
 from pygments.token import (Comment, Error, Generic, Keyword, Name, Number,
-                            Operator, String, Token)
+                            Operator, String, Text, Token)
 from pygments.util import ClassNotFound
 import pypdf
 import weasyprint
@@ -114,19 +114,20 @@ def font_face_css():
 # tema de Pygments ya hecho, pon `code_theme: monokai` (dracula, github-dark,
 # solarized-light, friendly, nord, gruvbox-dark, etc.).
 
-# Gama cálida: marrones suaves y naranjas, sobre un fondo crema tenue.
+# Gama oscura apagada: tonos desaturados sobre un fondo gris pizarra, con buen
+# contraste pero sin colores chillones. Pensada para lectura cómoda en impreso.
 CODE_PALETTE = {
-    "background": "#faf6f0",   # fondo del bloque, crema cálido
-    "text":       "#4a3b2f",   # texto por defecto, marrón oscuro
-    "comment":    "#a89580",   # comentarios, marrón claro apagado (cursiva)
-    "keyword":    "#c25d1e",   # palabras clave (def, return, if…), naranja quemado
-    "builtin":    "#b07d2b",   # funciones/constantes integradas, ámbar
-    "name":       "#5a4636",   # identificadores, marrón medio
-    "function":   "#a85420",   # nombres de función/clase, naranja terroso
-    "string":     "#8a6d3b",   # cadenas de texto, tan tostado
-    "number":     "#bf6a1f",   # números, naranja cálido
-    "operator":   "#c25d1e",   # operadores (+, =, ->), naranja quemado
-    "error":      "#b3402a",   # tokens erróneos, rojo-ladrillo
+    "background": "#21252b",   # fondo del bloque, gris pizarra oscuro
+    "text":       "#c5cad3",   # texto por defecto, gris claro suave
+    "comment":    "#6b7480",   # comentarios, gris medio apagado (cursiva)
+    "keyword":    "#b48ead",   # palabras clave (def, return, if…), malva apagado
+    "builtin":    "#81a1c1",   # funciones/constantes integradas, azul apagado
+    "name":       "#c5cad3",   # identificadores, gris claro suave
+    "function":   "#88c0d0",   # nombres de función/clase, cian apagado
+    "string":     "#a3be8c",   # cadenas de texto, verde salvia apagado
+    "number":     "#d08770",   # números, naranja terroso apagado
+    "operator":   "#b48ead",   # operadores (+, =, ->), malva apagado
+    "error":      "#bf616a",   # tokens erróneos, rojo apagado
 }
 
 
@@ -154,6 +155,16 @@ def _build_custom_style(palette):
 
 
 CUSTOM_CODE_STYLE = _build_custom_style(CODE_PALETTE)
+
+
+def _style_fg(style):
+    """Color de texto por defecto de un tema de Pygments (`#rrggbb`). Se pasa
+    como `prestyles` al HtmlFormatter: con `noclasses` Pygments solo colorea los
+    tokens resaltados, así que el texto plano (bloques sin lenguaje o fragmentos
+    no resaltados) heredaría el color oscuro del cuerpo y quedaría ilegible sobre
+    fondos oscuros; este color base, fijado en el `<pre>`, lo evita."""
+    color = style.style_for_token(Text).get("color")
+    return f"#{color}" if color else "#1a1a1a"
 
 
 def resolve_code_style(name):
@@ -196,7 +207,8 @@ def extract_themed_blocks(body_md):
             lexer = get_lexer_by_name(lang)
         except ClassNotFound:
             lexer = TextLexer()
-        formatter = HtmlFormatter(style=style, noclasses=True, cssclass="codehilite")
+        formatter = HtmlFormatter(style=style, noclasses=True, cssclass="codehilite",
+                                  prestyles=f"color:{_style_fg(style)}")
         token = f"CODEBLOCKTHEME{len(blocks)}MARKER"
         blocks[token] = highlight(m.group("code"), lexer, formatter)
         return f"\n\n{token}\n\n"
@@ -627,7 +639,8 @@ def content_html(meta, body_md, strings, code_style=CUSTOM_CODE_STYLE):
     md = markdown.Markdown(
         extensions=[TocExtension(toc_depth="2-3"), "tables", "fenced_code", "codehilite"],
         extension_configs={"codehilite": {
-            "noclasses": True, "guess_lang": False, "pygments_style": code_style}},
+            "noclasses": True, "guess_lang": False, "pygments_style": code_style,
+            "prestyles": f"color:{_style_fg(code_style)}"}},
     )
     # Los bloques con tema propio se resaltan aparte y se reinyectan tras la
     # conversión; el resto usa el tema general (code_style) vía codehilite.

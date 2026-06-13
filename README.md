@@ -173,8 +173,8 @@ El color del resaltado de sintaxis se controla a **dos niveles**.
 
 **1. Tema de todo el documento — `code_theme` en el front matter.** Acepta:
 
-- *(vacío)* o `custom` → la **paleta cálida personalizada** (marrones suaves y
-  naranjas) definida en `md_to_pdf.py`. Es el valor por defecto.
+- *(vacío)* o `custom` → la **paleta oscura apagada personalizada** (gris pizarra
+  con acentos desaturados) definida en `md_to_pdf.py`. Es el valor por defecto.
 - El nombre de **cualquier tema de Pygments**: `monokai`, `dracula`,
   `github-dark`, `solarized-light`, `solarized-dark`, `nord`, `gruvbox-dark`,
   `friendly`, `default`… (lista completa: `python -m pygments -L styles`).
@@ -204,7 +204,7 @@ un mismo PDF:
 Acepta los mismos valores que `code_theme` (un tema de Pygments o `custom`). Si
 hay también un `<!-- caption: -->`, ponlo **encima** del `<!-- code-theme: -->`.
 
-**Personalizar la paleta cálida.** Edita el diccionario `CODE_PALETTE` cerca del
+**Personalizar la paleta por defecto.** Edita el diccionario `CODE_PALETTE` cerca del
 principio de `md_to_pdf.py`: cada clave (`keyword`, `string`, `comment`,
 `function`, `number`, `background`…) es un color hex que puedes cambiar a tu
 gusto. Los temas oscuros funcionan porque el `<pre>` interior es transparente y
