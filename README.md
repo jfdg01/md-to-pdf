@@ -292,26 +292,26 @@ is kept as-is.
 
 | Key                  | Sizes                                              | Default  |
 |----------------------|----------------------------------------------------|----------|
-| `text_size`          | Body text                                          | `14pt`   |
-| `title_size`         | Cover title                                        | `27pt`   |
-| `subtitle_size`      | Cover subtitle                                     | `16.5pt` |
-| `comment_size`       | Cover comment line                                 | `13pt`   |
-| `author_size`        | Cover author line (footer uses `footer_size`)      | `14pt`   |
+| `text_size`          | Body text                                          | `11pt`   |
+| `title_size`         | Cover title                                        | `26pt`   |
+| `subtitle_size`      | Cover subtitle                                     | `15pt`   |
+| `comment_size`       | Cover comment line                                 | `11.5pt` |
+| `author_size`        | Cover author line (footer uses `footer_size`)      | `13pt`   |
 | `h1_size`…`h6_size`  | Body headings, per level                           | varies   |
-| `code_size`          | Code blocks and inline code                        | `11.5pt` |
-| `table_size`         | Tables                                             | `13pt`   |
-| `caption_size`       | Figure captions, table captions, code-block labels | `12pt`   |
-| `index_heading_size` | "Contents" / "List of …" page headings             | `18.5pt` |
-| `header_size`        | Running header                                     | `9.5pt`  |
-| `footer_size`        | Running footer and page number                     | `9.5pt`  |
+| `code_size`          | Code blocks and inline code                        | `10pt`   |
+| `table_size`         | Tables                                             | `10.5pt` |
+| `caption_size`       | Figure captions, table captions, code-block labels | `9.5pt`  |
+| `index_heading_size` | "Contents" / "List of …" page headings             | `17pt`   |
+| `header_size`        | Running header                                     | `9pt`    |
+| `footer_size`        | Running footer and page number                     | `9pt`    |
 
 The **table-of-contents** lines have their own sizes, per nesting level:
 `toc_size` sets every level at once, while `toc1_size`…`toc4_size` override an
 individual level (`1` = top-level `##` entries, `2` = `###`, `3` = `####`,
 `4` = `#####`; deeper levels inherit level 4). A per-level key wins over the
-general `toc_size`. Defaults are `12pt`/`11pt`/`10.5pt`/`10pt`. The general
+general `toc_size`. Defaults are `11pt`/`10.5pt`/`10pt`/`10pt`. The general
 `toc_size` also sizes the **lists of figures/tables/code blocks** (default
-`11pt`).
+`10.5pt`).
 
 ---
 

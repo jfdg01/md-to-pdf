@@ -58,23 +58,23 @@ citation_style: numeric               # numeric ([1]) | author-year ((Smith, 202
 
 # ── Font sizes ───────────────────────────────────────────────────────────────
 # A bare number is points (14 -> 14pt); any CSS unit also works (1.2em, 12px).
-text_size:          14                # body text
-title_size:         27                # cover title
-subtitle_size:      16.5              # cover subtitle
-comment_size:       13                # cover comment line
-author_size:        14                # cover author (footer uses footer_size)
-h1_size:            24.5              # body headings, per level
-h2_size:            18.5
-h3_size:            15
-h4_size:            13.5
-h5_size:            12.5
-# h6_size:          12                # h6 has no built-in size; uncomment to set
-code_size:          11.5              # code blocks and inline code
-table_size:         13                # tables
-caption_size:       12                # figure/table captions and code labels
-index_heading_size: 18.5              # "Contents" / "List of …" page headings
-header_size:        9.5               # running header (title · subtitle)
-footer_size:        9.5               # running footer (author) and page number
+text_size:          11                # body text
+title_size:         26                # cover title
+subtitle_size:      15                # cover subtitle
+comment_size:       11.5              # cover comment line
+author_size:        13                # cover author (footer uses footer_size)
+h1_size:            19                # body headings, per level
+h2_size:            16
+h3_size:            13.5
+h4_size:            12
+h5_size:            11
+# h6_size:          11                # h6 has no built-in size; uncomment to set
+code_size:          10                # code blocks and inline code
+table_size:         10.5              # tables
+caption_size:       9.5               # figure/table captions and code labels
+index_heading_size: 17                # "Contents" / "List of …" page headings
+header_size:        9                 # running header (title · subtitle)
+footer_size:        9                 # running footer (author) and page number
 
 
 # ── Table-of-contents line sizes ─────────────────────────────────────────────
@@ -82,7 +82,7 @@ footer_size:        9.5               # running footer (author) and page number
 # (1 = top-level ## entries, 2 = ###, 3 = ####, 4 = #####). Per-level wins over
 # toc_size; deeper levels inherit level 4. toc_size also sizes the index lists.
 # toc_size: 11
-toc1_size: 12
-toc2_size: 11
-toc3_size: 10.5
+toc1_size: 11
+toc2_size: 10.5
+toc3_size: 10
 toc4_size: 10

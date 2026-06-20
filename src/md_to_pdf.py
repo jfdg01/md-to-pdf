@@ -248,7 +248,7 @@ html, body {
     margin: 0;
     padding: 0;
     font-family: 'Source Serif 4', Georgia, serif;
-    font-size: 14pt;
+    font-size: 11pt;
     line-height: 1.6;
     color: #1a1a1a;
 }
@@ -273,20 +273,20 @@ html, body {
 }
 .cover h1 {
     font-family: 'Space Grotesk', Arial, sans-serif;
-    font-size: 27pt;
+    font-size: 26pt;
     font-weight: bold;
     border: none;
     margin: 0 0 20px 0;
     line-height: 1.3;
 }
-.cover .subtitle  { font-size: 16.5pt; font-style: italic; color: #444; margin: 0 0 6px 0; }
-.cover .meta-line { font-size: 13pt; color: #555; margin: 3px 0; }
+.cover .subtitle  { font-size: 15pt; font-style: italic; color: #444; margin: 0 0 6px 0; }
+.cover .meta-line { font-size: 11.5pt; color: #555; margin: 3px 0; }
 .cover .logo      { max-width: 180px; max-height: 180px; object-fit: contain; margin: 40px 0; }
-.cover .author    { font-size: 14pt; font-style: italic; color: #333; padding-bottom: 1cm; }
+.cover .author    { font-size: 13pt; font-style: italic; color: #333; padding-bottom: 1cm; }
 
 /* ── Table of contents ── */
 .toc-page { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
-.toc-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18.5pt; margin-bottom: 20px; }
+.toc-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17pt; margin-bottom: 20px; }
 /* TOC font: force the document serif on every element of the TOC tree, so it
    doesn't inherit a system font. */
 .toc-page .toc, .toc-page .toc * { font-family: 'Source Serif 4', Georgia, serif; }
@@ -300,7 +300,7 @@ html, body {
 /* ── Lists of figures/tables/code ── */
 .indices-section { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
 .idx-block { margin-bottom: 32px; }
-.idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18.5pt; margin-bottom: 16px; }
+.idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17pt; margin-bottom: 16px; }
 .doc-index { list-style: none; margin: 0; padding: 0; }
 .doc-index li { padding: 5px 0; }
 .doc-index a { text-decoration: none; color: #1a1a1a; }
@@ -309,27 +309,27 @@ html, body {
 /* ── Content ── */
 a { color: #5a8fc4; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', Arial, sans-serif; }
-h1 { font-size: 24.5pt; margin-bottom: 16px; }
+h1 { font-size: 19pt; margin-bottom: 16px; }
 /* Each ## section starts on a new page. The forced break after the TOC and this
    one merge, so no blank page appears. */
 .body h2 { break-before: page; }
-h2 { font-size: 18.5pt; margin-top: 28px; }
-h3 { font-size: 15pt; margin-top: 20px; color: #222; }
-h4 { font-size: 13.5pt; margin-top: 18px; color: #333; }
-h5 { font-size: 12.5pt; margin-top: 16px; color: #444; }
+h2 { font-size: 16pt; margin-top: 28px; }
+h3 { font-size: 13.5pt; margin-top: 20px; color: #222; }
+h4 { font-size: 12pt; margin-top: 18px; color: #333; }
+h5 { font-size: 11pt; margin-top: 16px; color: #444; }
 code {
     font-family: 'Space Mono', 'DejaVu Sans Mono', monospace;
     background: #f4f4f4;
     padding: 1px 4px;
     border-radius: 3px;
-    font-size: 12pt;
+    font-size: 10.5pt;
 }
 pre {
     font-family: 'Space Mono', 'DejaVu Sans Mono', monospace;
     background: #f4f4f4;
     border-radius: 4px;
     padding: 12px;
-    font-size: 11.5pt;
+    font-size: 10pt;
     line-height: 1.4;
     break-inside: avoid;
     white-space: pre-wrap;
@@ -342,7 +342,7 @@ pre code { background: none; padding: 0; }
    without the grey `pre` background covering them. */
 .codehilite { background: #f4f4f4; border-radius: 4px; padding: 12px; break-inside: avoid; }
 .codehilite pre { background: transparent; padding: 0; margin: 0; border-radius: 0; }
-table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13pt; break-inside: avoid; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10.5pt; break-inside: avoid; }
 th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
 th { background: #e8e8e8; font-weight: bold; }
 blockquote {
@@ -358,11 +358,11 @@ li { margin: 0; }
 li > p { margin: 0; padding: 0; }
 figure { margin: 14px auto; text-align: center; break-inside: avoid; }
 figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-figcaption { font-size: 12pt; color: #555; margin-top: 5px; font-style: italic; }
-caption { caption-side: bottom; font-size: 12pt; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
+figcaption { font-size: 9.5pt; color: #555; margin-top: 5px; font-style: italic; }
+caption { caption-side: bottom; font-size: 9.5pt; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
 .code-block { margin: 12px 0; break-inside: avoid; }
 .code-block > pre, .code-block > .codehilite { margin: 0; }
-.code-label { font-size: 12pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
+.code-label { font-size: 9.5pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
 
 /* ── Citations and bibliography ── */
 a.cite { text-decoration: none; }
@@ -423,7 +423,7 @@ FONT_SIZE_SELECTORS = {
 }
 
 # Default size of the page header and footer (the @page margin boxes).
-DEFAULT_HEADER_FOOTER_SIZE = "9.5pt"
+DEFAULT_HEADER_FOOTER_SIZE = "9pt"
 
 
 def _font_size(val):
@@ -464,11 +464,11 @@ TOC_LEVEL_SELECTORS = {
 }
 
 # Default TOC line size per level (smaller and gently decreasing with depth).
-TOC_DEFAULT_SIZES = {1: "12pt", 2: "11pt", 3: "10.5pt", 4: "10pt"}
+TOC_DEFAULT_SIZES = {1: "11pt", 2: "10.5pt", 3: "10pt", 4: "10pt"}
 
 # Default size of the figure/table/code list lines (a flat, single-level list,
 # so it has no per-level keys — it just follows the general `toc_size`).
-TOC_INDEX_DEFAULT_SIZE = "11pt"
+TOC_INDEX_DEFAULT_SIZE = "10.5pt"
 
 
 def toc_size_css(meta):
