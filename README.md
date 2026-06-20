@@ -110,9 +110,12 @@ Más texto...
 | `locale`   | `es` (def.) o `en`: idioma de "Figura/Figure", índices…  | Todo el documento |
 | `code_theme`| Paleta de resaltado de código (ver más abajo)           | Bloques de código |
 | `numbering`| `true` numera solo las secciones automáticamente (def. `false`) | Secciones + índice |
+| `page_size`| Tamaño de página: `a4` (def.), `a5`, `a3`, `letter`, `legal`… | Todo el documento |
+| `orientation`| `portrait` (def.) o `landscape`                         | Todo el documento |
+| `margins`  | Márgenes del cuerpo en CSS (`1.15in 0.85in 0.95in 0.85in`) | Todo el documento |
 
 Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`,
-`numeracion`…).
+`numeracion`, `tamaño`, `orientacion`, `margenes`…).
 Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no defines
 `logo` pero existe un `logo.*` junto al `.md`, se usa automáticamente; con
 `logo: none` lo desactivas.
@@ -143,6 +146,31 @@ formato es `tipo-sección-índice`, las mismas anclas que se numeran solas). Se
 convierte en un enlace cuyo texto visible es el número del elemento («Figura
 2.1») y que salta a él al hacer clic. Si el ancla no existe, se avisa por consola
 y la marca se deja tal cual para que la localices.
+
+### Tamaño de página y márgenes
+
+Por defecto el documento es **A4 vertical**. Para cambiarlo, usa estas claves del
+front matter:
+
+- `page_size`: `a4` (def.), `a5`, `a3`, `letter`, `legal`, `b5`, `ledger`…
+- `orientation`: `portrait` (def.) o `landscape`.
+- `margins`: los márgenes del cuerpo como valor CSS (`top right bottom left`),
+  p. ej. `margins: 1.15in 0.85in 0.95in 0.85in` o `margins: 2cm`. También puedes
+  fijarlos por lado con `margin_top`, `margin_right`, `margin_bottom` y
+  `margin_left` (los lados que no indiques conservan el valor por defecto).
+
+```markdown
+---
+title: Apuntes en apaisado
+page_size: letter
+orientation: landscape
+margins: 1in 1.25in
+---
+```
+
+El tamaño y la orientación se aplican a **portada, índices y cuerpo** por igual.
+Si el tamaño o la orientación son desconocidos, se avisa por consola y se usa el
+valor por defecto (A4 / vertical).
 
 ### Listas
 
@@ -240,4 +268,5 @@ el fondo lo pinta el contenedor con el color del tema.
 - Al convertir varios ficheros, si uno falla se informa con `[ERROR: …]` y se
   continúa con el resto; el comando termina con código distinto de cero si hubo
   algún fallo.
-- El tamaño de página es A4.
+- El tamaño de página es A4 por defecto, configurable con `page_size`,
+  `orientation` y `margins` (ver arriba).

@@ -40,8 +40,19 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 FONTS_DIR = SCRIPT_DIR / "fonts"
 LOGO_NAMES = ["logo.webp", "logo.png", "logo.jpg", "logo_uja.webp", "logo_uja.png"]
 
-# Tamaño de página A4 en pulgadas y márgenes del cuerpo.
+# Tamaño y márgenes del cuerpo por defecto (TODO #5: ambos configurables desde el
+# front matter). DEFAULT_MARGINS va por lado: top right bottom left.
 PAGE_MARGIN = "1.15in 0.85in 0.95in 0.85in"
+DEFAULT_MARGINS = ("1.15in", "0.85in", "0.95in", "0.85in")
+
+# Tamaños de página admitidos (clave normalizada → palabra clave CSS de WeasyPrint).
+PAGE_SIZES = {
+    "a3": "A3", "a4": "A4", "a5": "A5",
+    "b4": "B4", "b5": "B5",
+    "letter": "letter", "carta": "letter",
+    "legal": "legal", "oficio": "legal",
+    "ledger": "ledger", "tabloid": "ledger",
+}
 
 STRINGS = {
     "es": {
@@ -368,8 +379,39 @@ def _css_str(s):
     return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def page_css(meta, strings):
-    """@page del cuerpo: márgenes + cabecera (título · subtítulo) y pie
+def resolve_page_size(meta):
+    """Resuelve `page_size` + `orientation` a un valor CSS para `@page { size }`
+    (p. ej. 'A4' o 'letter landscape'). Avisa y cae en el valor por defecto si el
+    tamaño o la orientación son desconocidos (igual que con `code_theme`)."""
+    name = (meta.get("page_size") or "").strip().lower()
+    size = PAGE_SIZES.get(name, "A4") if name else "A4"
+    if name and name not in PAGE_SIZES:
+        print(f"    (aviso: tamaño de página '{name}' desconocido; uso A4)",
+              file=sys.stderr)
+    orient = (meta.get("orientation") or "").strip().lower()
+    if orient in ("landscape", "apaisado", "horizontal"):
+        return f"{size} landscape"
+    if orient and orient not in ("portrait", "vertical", "retrato"):
+        print(f"    (aviso: orientación '{orient}' desconocida; uso vertical)",
+              file=sys.stderr)
+    return size
+
+
+def resolve_margins(meta):
+    """Resuelve los márgenes del cuerpo a un valor CSS `top right bottom left`.
+    Prioriza `margins` (CSS literal, p. ej. '1.15in 0.85in'); si no, compone con
+    las claves por lado (`margin_top`…), usando el valor por defecto en las que
+    falten."""
+    whole = (meta.get("margins") or "").strip()
+    if whole:
+        return whole
+    sides = ("margin_top", "margin_right", "margin_bottom", "margin_left")
+    return " ".join((meta.get(k) or "").strip() or d
+                    for k, d in zip(sides, DEFAULT_MARGINS))
+
+
+def page_css(meta, strings, page_size):
+    """@page del cuerpo: tamaño + márgenes + cabecera (título · subtítulo) y pie
     (autor centrado, 'n / total' a la derecha). El texto se incrusta como
     cadenas CSS; los recuadros de margen recortan lo que sobre."""
     header = " · ".join(filter(None, [meta.get("title", ""), meta.get("subtitle", "")]))
@@ -378,8 +420,8 @@ def page_css(meta, strings):
     bottom = (f'content: "{_css_str(author)}";' if author else "content: none;")
     return f"""
 @page {{
-    size: A4;
-    margin: {PAGE_MARGIN};
+    size: {page_size};
+    margin: {resolve_margins(meta)};
     @top-center {{
         {top}
         font-family: 'Space Grotesk', Arial, sans-serif;
@@ -415,6 +457,18 @@ _META_ALIASES = {
     "tema_código": "code_theme",
     "numbering": "numbering", "numeracion": "numbering",
     "numeración": "numbering", "numerar": "numbering",
+    "page_size": "page_size", "pagesize": "page_size",
+    "tamano": "page_size", "tamaño": "page_size",
+    "tamano_pagina": "page_size", "tamaño_pagina": "page_size",
+    "tamaño_página": "page_size",
+    "orientation": "orientation", "orientacion": "orientation",
+    "orientación": "orientation",
+    "margins": "margins", "margenes": "margins", "márgenes": "margins",
+    "margin": "margins", "margen": "margins",
+    "margin_top": "margin_top", "margen_superior": "margin_top",
+    "margin_right": "margin_right", "margen_derecho": "margin_right",
+    "margin_bottom": "margin_bottom", "margen_inferior": "margin_bottom",
+    "margin_left": "margin_left", "margen_izquierdo": "margin_left",
 }
 
 
@@ -425,7 +479,10 @@ def parse_front_matter(text):
     Si no hay front matter, el cuerpo es el texto entero y el título se toma del
     primer encabezado `# ` (que se elimina del cuerpo para no duplicarlo)."""
     meta = {"title": "", "subtitle": "", "comment": "", "author": "",
-            "logo": "", "lang": "es", "code_theme": "", "numbering": ""}
+            "logo": "", "lang": "es", "code_theme": "", "numbering": "",
+            "page_size": "", "orientation": "", "margins": "",
+            "margin_top": "", "margin_right": "", "margin_bottom": "",
+            "margin_left": ""}
     lines = text.splitlines()
     body_start = 0
 
@@ -671,7 +728,7 @@ def _indices_html(figures, tables, code_blocks, strings):
 
 # ─────────────────────────── HTML (portada y contenido) ───────────────────────────
 
-def cover_html(meta, logo_uri, strings):
+def cover_html(meta, logo_uri, strings, page_size):
     title = escape(meta["title"])
     subtitle = escape(meta["subtitle"])
     comment = escape(meta["comment"])
@@ -685,7 +742,7 @@ def cover_html(meta, logo_uri, strings):
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>@page {{ size: A4; margin: 0; }}{font_face_css()}{BASE_CSS}</style>
+<style>@page {{ size: {page_size}; margin: 0; }}{font_face_css()}{BASE_CSS}</style>
 </head>
 <body>
 <div class="cover">
@@ -701,7 +758,7 @@ def cover_html(meta, logo_uri, strings):
 </html>"""
 
 
-def content_html(meta, body_md, strings, code_style=CUSTOM_CODE_STYLE):
+def content_html(meta, body_md, strings, code_style, page_size):
     """Índice + índices + cuerpo en un único HTML. Lanza ValueError si algún
     elemento carece de descripción (TODO #7)."""
     md = markdown.Markdown(
@@ -736,7 +793,7 @@ def content_html(meta, body_md, strings, code_style=CUSTOM_CODE_STYLE):
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>{page_css(meta, strings)}{font_face_css()}{BASE_CSS}</style>
+<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}</style>
 </head>
 <body>
 <div class="toc-page">
@@ -782,11 +839,13 @@ def convert_one(md_path):
     logo_uri = find_logo(md_path, meta)
     base_url = md_path.resolve().parent.as_uri() + "/"
     code_style = resolve_code_style(meta.get("code_theme"))
+    page_size = resolve_page_size(meta)
 
-    html = content_html(meta, body_md, strings, code_style)
+    html = content_html(meta, body_md, strings, code_style, page_size)
     content_pdf = weasyprint.HTML(string=html, base_url=base_url).write_pdf()
     cover_pdf = weasyprint.HTML(
-        string=cover_html(meta, logo_uri, strings), base_url=base_url).write_pdf()
+        string=cover_html(meta, logo_uri, strings, page_size),
+        base_url=base_url).write_pdf()
 
     pdf_bytes = merge_pdfs(cover_pdf, content_pdf, meta)
     pdf_path.write_bytes(pdf_bytes)
