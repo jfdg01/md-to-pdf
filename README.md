@@ -294,7 +294,9 @@ The **table-of-contents** lines have their own sizes, per nesting level:
 `toc_size` sets every level at once, while `toc1_size`…`toc4_size` override an
 individual level (`1` = top-level `##` entries, `2` = `###`, `3` = `####`,
 `4` = `#####`; deeper levels inherit level 4). A per-level key wins over the
-general `toc_size`. Defaults are `12pt`/`11pt`/`10.5pt`/`10pt`.
+general `toc_size`. Defaults are `12pt`/`11pt`/`10.5pt`/`10pt`. The general
+`toc_size` also sizes the **lists of figures/tables/code blocks** (default
+`11pt`).
 
 ---
 

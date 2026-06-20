@@ -302,7 +302,7 @@ html, body {
 .idx-block { margin-bottom: 32px; }
 .idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18.5pt; margin-bottom: 16px; }
 .doc-index { list-style: none; margin: 0; padding: 0; }
-.doc-index li { padding: 5px 0; font-size: 14pt; }
+.doc-index li { padding: 5px 0; }
 .doc-index a { text-decoration: none; color: #1a1a1a; }
 .idx-label { font-weight: bold; }
 
@@ -459,19 +459,25 @@ TOC_LEVEL_SELECTORS = {
 # Default TOC line size per level (smaller and gently decreasing with depth).
 TOC_DEFAULT_SIZES = {1: "12pt", 2: "11pt", 3: "10.5pt", 4: "10pt"}
 
+# Default size of the figure/table/code list lines (a flat, single-level list,
+# so it has no per-level keys — it just follows the general `toc_size`).
+TOC_INDEX_DEFAULT_SIZE = "11pt"
+
 
 def toc_size_css(meta):
     """CSS font-size rules for the table-of-contents lines, per nesting level.
     `toc_size` sets every level at once; `toc1_size`…`toc4_size` override an
     individual level (1 = top-level `##` sections, 2 = `###`, 3 = `####`,
     4 = `#####`). Each level falls back to the general `toc_size`, then to the
-    built-in default in TOC_DEFAULT_SIZES."""
+    built-in default in TOC_DEFAULT_SIZES. The general `toc_size` also sizes the
+    figure/table/code lists (`.doc-index li`)."""
     general = _font_size(meta.get("toc_size"))
     rules = []
     for level, selector in TOC_LEVEL_SELECTORS.items():
         size = (_font_size(meta.get(f"toc{level}_size")) or general
                 or TOC_DEFAULT_SIZES[level])
         rules.append(f"{selector} {{ font-size: {size}; }}")
+    rules.append(f".doc-index li {{ font-size: {general or TOC_INDEX_DEFAULT_SIZE}; }}")
     return "\n".join(rules)
 
 
