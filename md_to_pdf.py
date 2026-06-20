@@ -71,6 +71,11 @@ def get_strings(lang):
     return STRINGS.get((lang or "es").lower(), STRINGS["es"])
 
 
+def _truthy(val):
+    """Interpreta un valor de front matter como booleano (true/false, sí/no…)."""
+    return str(val).strip().lower() in ("true", "1", "yes", "si", "sí", "on")
+
+
 # ─────────────────────────── Fuentes ───────────────────────────
 
 def _face(family, rel, weight, style):
@@ -408,6 +413,8 @@ _META_ALIASES = {
     "code_theme": "code_theme", "code_style": "code_theme",
     "codetheme": "code_theme", "tema_codigo": "code_theme",
     "tema_código": "code_theme",
+    "numbering": "numbering", "numeracion": "numbering",
+    "numeración": "numbering", "numerar": "numbering",
 }
 
 
@@ -418,7 +425,7 @@ def parse_front_matter(text):
     Si no hay front matter, el cuerpo es el texto entero y el título se toma del
     primer encabezado `# ` (que se elimina del cuerpo para no duplicarlo)."""
     meta = {"title": "", "subtitle": "", "comment": "", "author": "",
-            "logo": "", "lang": "es", "code_theme": ""}
+            "logo": "", "lang": "es", "code_theme": "", "numbering": ""}
     lines = text.splitlines()
     body_start = 0
 
@@ -468,6 +475,67 @@ def find_logo(md_path, meta):
             mime = mimetypes.guess_type(logo.name)[0] or "image/png"
             return f"data:{mime};base64,{base64.b64encode(data).decode()}"
     return None
+
+
+# ─────────────────────── Numeración de secciones y referencias cruzadas ───────────────────────
+
+_HEADING_RE = re.compile(r'^(#{2,6})\s+(.*)$')
+_FENCE_RE = re.compile(r'^\s*(```|~~~)')
+
+
+def apply_section_numbering(body_md):
+    """Numera automáticamente los encabezados de sección (`##` → 1, 2, 3…) y
+    subsección (`###` → 1.1, 1.2…) en el Markdown antes de convertirlo, de modo
+    que el número aparezca igual en el cuerpo, en el índice de contenidos y en los
+    marcadores (outline) del PDF, sin que el autor lo escriba a mano.
+
+    Solo afecta a `##` y `###`; ignora los encabezados dentro de vallas de código.
+    Se activa con `numbering: true` en el front matter (def. desactivado para no
+    romper documentos que ya traen la numeración escrita a mano)."""
+    h2 = h3 = 0
+    in_fence = False
+    out = []
+    for line in body_md.split("\n"):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        m = None if in_fence else _HEADING_RE.match(line)
+        if m and len(m.group(1)) == 2:
+            h2 += 1
+            h3 = 0
+            out.append(f"## {h2}. {m.group(2)}")
+        elif m and len(m.group(1)) == 3:
+            h3 += 1
+            out.append(f"### {h2}.{h3} {m.group(2)}")
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+# Referencia cruzada `[[fig-2-1]]` / `[[tab-1-1]]` / `[[code-3-2]]`: apunta a las
+# anclas que genera add_asset_numbers. El patrón es estricto (tipo-x-y) para no
+# capturar dobles corchetes que aparezcan por casualidad en el texto o el código.
+_XREF_RE = re.compile(r'\[\[\s*((?:fig|tab|code)-\d+-\d+)\s*\]\]')
+
+
+def resolve_cross_refs(html, figures, tables, code_blocks):
+    """Resuelve las referencias cruzadas `[[fig-2-1]]` a un enlace al ancla del
+    elemento, mostrando su número como texto visible (p. ej. «Figura 2.1»). Avisa
+    de las referencias a anclas inexistentes y las deja sin tocar para que el
+    autor las localice (igual que con un `code_theme` desconocido)."""
+    labels = {aid: nl for nl, cap, aid in (*figures, *tables, *code_blocks)}
+
+    def repl(m):
+        aid = m.group(1)
+        label = labels.get(aid)
+        if not label:
+            print(f"    (aviso: referencia cruzada a '{aid}' inexistente)",
+                  file=sys.stderr)
+            return m.group(0)
+        return f'<a href="#{aid}" class="xref">{escape(label)}</a>'
+
+    return _XREF_RE.sub(repl, html)
 
 
 # ─────────────────────── Numeración de figuras/tablas/código ───────────────────────
@@ -642,6 +710,10 @@ def content_html(meta, body_md, strings, code_style=CUSTOM_CODE_STYLE):
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}"}},
     )
+    # Numeración automática de secciones (opcional): se aplica al Markdown antes
+    # de convertir, para que el número quede reflejado en cuerpo, índice y outline.
+    if _truthy(meta.get("numbering")):
+        body_md = apply_section_numbering(body_md)
     # Los bloques con tema propio se resaltan aparte y se reinyectan tras la
     # conversión; el resto usa el tema general (code_style) vía codehilite.
     body_md, themed_blocks = extract_themed_blocks(body_md)
@@ -656,6 +728,7 @@ def content_html(meta, body_md, strings, code_style=CUSTOM_CODE_STYLE):
             "elementos sin descripción (añade <!-- caption: ... --> o un alt): "
             + ", ".join(missing)
         )
+    body = resolve_cross_refs(body, figures, tables, code_blocks)
     body = apply_keep_with_prev(body)
     indices = _indices_html(figures, tables, code_blocks, strings)
     lang = meta.get("lang", "es")

@@ -109,8 +109,10 @@ Más texto...
 | `logo`     | Ruta a **cualquier** imagen para la portada              | Portada           |
 | `locale`   | `es` (def.) o `en`: idioma de "Figura/Figure", índices…  | Todo el documento |
 | `code_theme`| Paleta de resaltado de código (ver más abajo)           | Bloques de código |
+| `numbering`| `true` numera solo las secciones automáticamente (def. `false`) | Secciones + índice |
 
-Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`…).
+Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`,
+`numeracion`…).
 Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no defines
 `logo` pero existe un `logo.*` junto al `.md`, se usa automáticamente; con
 `logo: none` lo desactivas.
@@ -118,12 +120,29 @@ Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no define
 ### Reglas del cuerpo
 
 - **`## ` = sección.** Cada encabezado de nivel 2 empieza en una **página nueva**.
-  Numéralas `## 1. ...`, `## 2. ...` si quieres numeración.
+  Numéralas `## 1. ...`, `## 2. ...` a mano, o activa `numbering: true` (abajo).
 - **`### ` = subsección.** No fuerza salto de página.
 - **El índice** lista automáticamente los `##` y `###`, con enlaces que saltan a
   la sección al hacer clic, y el PDF incluye **marcadores** con esa jerarquía.
 - Funciona el Markdown habitual: **negrita**, *cursiva*, listas, tablas, `código`
   en línea y bloques con triple acento grave, citas.
+
+### Numeración automática de secciones
+
+Con `numbering: true` en el front matter, el conversor numera las secciones por
+ti: los `##` reciben `1.`, `2.`, `3.`… y los `###` su `1.1`, `1.2`… El número
+aparece igual en el cuerpo, en el índice de contenidos y en los marcadores del
+PDF, así que **no lo escribas a mano** en los encabezados (def. `false`, para no
+duplicar la numeración de los documentos que ya la traen escrita).
+
+### Referencias cruzadas
+
+Para enlazar a una figura, tabla o bloque de código por su número, escribe su
+ancla entre dobles corchetes: `[[fig-2-1]]`, `[[tab-2-1]]` o `[[code-2-1]]` (el
+formato es `tipo-sección-índice`, las mismas anclas que se numeran solas). Se
+convierte en un enlace cuyo texto visible es el número del elemento («Figura
+2.1») y que salta a él al hacer clic. Si el ancla no existe, se avisa por consola
+y la marca se deja tal cual para que la localices.
 
 ### Listas
 
