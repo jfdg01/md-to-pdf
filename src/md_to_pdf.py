@@ -1105,12 +1105,12 @@ def convert_and_report(md_path):
         return False
 
 
-def watch_files(md_files, watch_all):
-    """Vigila los .md y regenera su PDF cada vez que se guardan (TODO #10). Con
-    `watch_all` (sin archivos en la línea de órdenes) vigila todos los .md del
-    directorio actual, incluidos los que se creen después. Aplica un pequeño
-    debounce para no regenerar dos veces ante varios eventos de guardado seguidos,
-    y sale limpiamente con Ctrl-C."""
+def watch_files(md_files, watch_dirs):
+    """Vigila los .md y regenera su PDF cada vez que se guardan (TODO #10). Los
+    directorios indicados en la línea de órdenes se vigilan enteros, incluidos los
+    .md que se creen después. Aplica un pequeño debounce para no regenerar dos
+    veces ante varios eventos de guardado seguidos, y sale limpiamente con
+    Ctrl-C."""
     try:
         from watchdog.events import FileSystemEventHandler
         from watchdog.observers import Observer
@@ -1120,10 +1120,11 @@ def watch_files(md_files, watch_all):
 
     import threading
 
-    # Rutas absolutas vigiladas → Path a convertir. En modo watch_all crece con
-    # los .md nuevos que aparezcan en el directorio.
+    # Rutas absolutas vigiladas → Path a convertir. El conjunto crece con los .md
+    # nuevos que aparezcan en alguno de los directorios indicados.
     targets = {p.resolve(): p for p in md_files}
-    dirs = sorted({p.resolve().parent for p in md_files}) or [Path(".").resolve()]
+    watched_dirs = {d.resolve() for d in watch_dirs}
+    dirs = sorted(watched_dirs | {p.resolve().parent for p in md_files})
 
     debounce = 0.3
     timers = {}
@@ -1147,8 +1148,8 @@ def watch_files(md_files, watch_all):
             return None
         if p in targets:
             return p
-        if watch_all:
-            targets[p] = p   # convertir usando la ruta absoluta
+        if p.parent in watched_dirs:
+            targets[p] = p   # .md nuevo dentro de un directorio vigilado
             return p
         return None
 
@@ -1173,8 +1174,10 @@ def watch_files(md_files, watch_all):
     # Conversión inicial para dejar los PDF al día al arrancar.
     for md_path in md_files:
         convert_and_report(md_path)
-    print(f"Vigilando {'el directorio actual' if watch_all else f'{len(targets)} archivo(s)'}"
-          f". Pulsa Ctrl-C para salir.")
+    resumen = f"{len(targets)} archivo(s)"
+    if watched_dirs:
+        resumen += f" y {len(watched_dirs)} directorio(s)"
+    print(f"Vigilando {resumen}. Pulsa Ctrl-C para salir.")
 
     try:
         while True:
@@ -1189,23 +1192,40 @@ def watch_files(md_files, watch_all):
         observer.join()
 
 
+def collect_md_files(args):
+    """Expande los argumentos en la lista de .md a convertir. Cada argumento puede
+    ser un fichero .md concreto o un directorio (se toman todos sus .md, sin
+    recursión). Devuelve los .md y la lista de directorios indicados (los que el
+    modo --watch vigila enteros para detectar .md nuevos)."""
+    md_files = []
+    watch_dirs = []
+    for arg in args:
+        p = Path(arg)
+        if p.is_dir():
+            md_files += sorted(p.glob("*.md"))
+            watch_dirs.append(p)
+        else:
+            md_files.append(p)
+    return md_files, watch_dirs
+
+
 def main():
     watch = False
-    files = []
+    args = []
     for arg in sys.argv[1:]:
         if arg in ("--watch", "-w"):
             watch = True
         else:
-            files.append(arg)
+            args.append(arg)
 
-    watch_all = not files
-    if files:
-        md_files = [Path(p) for p in files]
-    else:
-        md_files = sorted(Path(".").glob("*.md"))
+    if not args:
+        print("Uso: md-to-pdf [--watch] <archivo.md | directorio> ...")
+        sys.exit(1)
+
+    md_files, watch_dirs = collect_md_files(args)
 
     if watch:
-        watch_files(md_files, watch_all)
+        watch_files(md_files, watch_dirs)
         return
 
     if not md_files:

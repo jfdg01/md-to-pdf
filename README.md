@@ -69,8 +69,11 @@ md-to-pdf informe.md
 # Convierte VARIOS ficheros
 md-to-pdf tema1.md tema2.md
 
-# Sin argumentos: convierte TODOS los .md del directorio actual
-md-to-pdf
+# Convierte TODOS los .md de un directorio (sin recursión)
+md-to-pdf apuntes/
+
+# El directorio actual también vale
+md-to-pdf .
 ```
 
 Cada PDF se escribe junto a su `.md` de origen, con el mismo nombre.
@@ -81,11 +84,11 @@ Con `--watch`, el conversor se queda observando y **regenera el PDF cada vez que
 guardas** el `.md`, con el mismo formato de salida que la conversión única:
 
 ```bash
-# Vigila TODOS los .md del directorio actual (incluidos los que crees después)
-md-to-pdf --watch
-
 # Vigila solo un fichero
 md-to-pdf --watch informe.md
+
+# Vigila un directorio entero (incluidos los .md que crees después)
+md-to-pdf --watch apuntes/
 ```
 
 Hace una conversión inicial al arrancar y aplica un pequeño *debounce* para no
