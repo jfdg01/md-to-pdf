@@ -146,8 +146,8 @@ Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`
 `numeracion`, `tamaño`, `orientacion`, `margenes`, `bibliografia`,
 `estilo_cita`…).
 Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no defines
-`logo` pero existe un `logo.*` junto al `.md`, se usa automáticamente; con
-`logo: none` lo desactivas.
+`logo`, la portada no lleva imagen; con `logo: none` también lo desactivas
+explícitamente.
 
 ### Reglas del cuerpo
 

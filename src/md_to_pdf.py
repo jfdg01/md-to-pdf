@@ -41,8 +41,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT_DIR = SCRIPT_DIR.parent            # raíz del repo (src/ cuelga de aquí)
 ASSETS_DIR = ROOT_DIR / "assets"        # fuentes e imágenes empaquetadas
 FONTS_DIR = ASSETS_DIR / "fonts"
-IMG_DIR = ASSETS_DIR / "img"
-LOGO_NAMES = ["logo.webp", "logo.png", "logo.jpg", "logo_uja.webp", "logo_uja.png"]
 
 # Tamaño y márgenes del cuerpo por defecto (TODO #5: ambos configurables desde el
 # front matter). DEFAULT_MARGINS va por lado: top right bottom left.
@@ -535,25 +533,20 @@ def parse_front_matter(text):
 
 
 def find_logo(md_path, meta):
-    """Resuelve el logo/imagen de portada a un data URI. Prioriza el campo
-    `logo:` del front matter (ruta arbitraria, TODO #3); si no, autodetecta
-    un fichero logo.* junto al .md o al script. `logo: none` lo desactiva."""
-    candidates = []
+    """Resuelve el logo/imagen de portada a un data URI a partir del campo
+    `logo:` del front matter (ruta arbitraria relativa al .md o absoluta).
+    Si no se indica `logo:`, la portada no lleva imagen. `logo: none` también
+    lo desactiva explícitamente."""
     logo_field = (meta.get("logo") or "").strip()
-    if logo_field.lower() in ("none", "no", "false"):
+    if not logo_field or logo_field.lower() in ("none", "no", "false"):
         return None
-    if logo_field:
-        p = Path(logo_field)
-        candidates = [p if p.is_absolute() else md_path.parent / p]
-    else:
-        for name in LOGO_NAMES:
-            candidates += [md_path.parent / name, IMG_DIR / name]
 
-    for logo in candidates:
-        if logo.exists():
-            data = logo.read_bytes()
-            mime = mimetypes.guess_type(logo.name)[0] or "image/png"
-            return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+    p = Path(logo_field)
+    logo = p if p.is_absolute() else md_path.parent / p
+    if logo.exists():
+        data = logo.read_bytes()
+        mime = mimetypes.guess_type(logo.name)[0] or "image/png"
+        return f"data:{mime};base64,{base64.b64encode(data).decode()}"
     return None
 
 
