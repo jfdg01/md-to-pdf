@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Launcher Linux: usa el Python del venv del propio repo.
 # Resuelve el symlink para localizar el repo aunque se invoque desde ~/.local/bin.
+# El script vive en src/ y el venv en la raíz del repo (un nivel por encima).
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-exec "$DIR/.venv/bin/python" "$DIR/md_to_pdf.py" "$@"
+ROOT="$(cd "$DIR/.." && pwd)"
+exec "$ROOT/.venv/bin/python" "$DIR/md_to_pdf.py" "$@"

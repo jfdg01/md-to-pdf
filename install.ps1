@@ -14,12 +14,14 @@ Push-Location $dir
 uv sync
 Pop-Location
 
+# El launcher md-to-pdf.cmd vive en src\, así que es esa carpeta la que va al PATH.
+$launcherDir = Join-Path $dir "src"
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($userPath -notlike "*$dir*") {
-    [Environment]::SetEnvironmentVariable("Path", "$userPath;$dir", "User")
-    Write-Host "Repo añadido al PATH de usuario."
+if ($userPath -notlike "*$launcherDir*") {
+    [Environment]::SetEnvironmentVariable("Path", "$userPath;$launcherDir", "User")
+    Write-Host "Carpeta src añadida al PATH de usuario."
 } else {
-    Write-Host "El repo ya estaba en el PATH."
+    Write-Host "El launcher ya estaba en el PATH."
 }
 
 Write-Host ""

@@ -13,9 +13,9 @@ fi
 echo "Creando .venv e instalando dependencias con uv ..."
 ( cd "$DIR" && uv sync )
 
-chmod +x "$DIR/md-to-pdf"
+chmod +x "$DIR/src/md-to-pdf"
 mkdir -p "$HOME/.local/bin"
-ln -sf "$DIR/md-to-pdf" "$HOME/.local/bin/md-to-pdf"
+ln -sf "$DIR/src/md-to-pdf" "$HOME/.local/bin/md-to-pdf"
 
 echo ""
 echo "Listo. Asegúrate de que ~/.local/bin está en el PATH y prueba:"

@@ -38,7 +38,10 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-FONTS_DIR = SCRIPT_DIR / "fonts"
+ROOT_DIR = SCRIPT_DIR.parent            # raíz del repo (src/ cuelga de aquí)
+ASSETS_DIR = ROOT_DIR / "assets"        # fuentes e imágenes empaquetadas
+FONTS_DIR = ASSETS_DIR / "fonts"
+IMG_DIR = ASSETS_DIR / "img"
 LOGO_NAMES = ["logo.webp", "logo.png", "logo.jpg", "logo_uja.webp", "logo_uja.png"]
 
 # Tamaño y márgenes del cuerpo por defecto (TODO #5: ambos configurables desde el
@@ -544,7 +547,7 @@ def find_logo(md_path, meta):
         candidates = [p if p.is_absolute() else md_path.parent / p]
     else:
         for name in LOGO_NAMES:
-            candidates += [md_path.parent / name, SCRIPT_DIR / name]
+            candidates += [md_path.parent / name, IMG_DIR / name]
 
     for logo in candidates:
         if logo.exists():

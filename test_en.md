@@ -3,7 +3,7 @@ title: Locale Test Document
 subtitle: English rendering check
 comment: June 2026
 author: Test User
-logo: foto1.jpg
+logo: assets/img/foto1.jpg
 locale: en
 bibliography: test_refs_en.bib
 citation_style: author-year
@@ -17,7 +17,7 @@ index titles should be in English. It also uses an arbitrary cover image via the
 `logo:` field instead of an auto-detected logo file.
 
 <!-- caption: A snowy mountain at dawn -->
-![Snowy mountain at dawn](foto1.jpg)
+![Snowy mountain at dawn](assets/img/foto1.jpg)
 
 <!-- caption: Sample configuration values -->
 | Name     | Type     | Default          |
@@ -48,4 +48,4 @@ A single citation [@brown2018] and a grouped one [@smith2020; @brown2018] render
 author-year markers, since this document sets `citation_style: author-year`.
 
 <!-- caption: An aerial view of a forest -->
-![Aerial view of a forest](foto2.jpg)
+![Aerial view of a forest](assets/img/foto2.jpg)

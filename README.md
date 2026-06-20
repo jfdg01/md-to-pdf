@@ -6,7 +6,7 @@ informes, manuales, apuntes o cualquier documento estructurado.
 
 El render lo hace **WeasyPrint** (Python puro, sin navegador): rápido, ligero y
 con el mismo resultado en cualquier máquina. Las fuentes (Source Serif 4, Space
-Grotesk, Space Mono) viajan con el repositorio en `fonts/`.
+Grotesk, Space Mono) viajan con el repositorio en `assets/fonts/`.
 
 ---
 
@@ -303,7 +303,7 @@ El color del resaltado de sintaxis se controla a **dos niveles**.
 **1. Tema de todo el documento — `code_theme` en el front matter.** Acepta:
 
 - *(vacío)* o `custom` → la **paleta oscura apagada personalizada** (gris pizarra
-  con acentos desaturados) definida en `md_to_pdf.py`. Es el valor por defecto.
+  con acentos desaturados) definida en `src/md_to_pdf.py`. Es el valor por defecto.
 - El nombre de **cualquier tema de Pygments**: `monokai`, `dracula`,
   `github-dark`, `solarized-light`, `solarized-dark`, `nord`, `gruvbox-dark`,
   `friendly`, `default`… (lista completa: `python -m pygments -L styles`).
@@ -334,7 +334,7 @@ Acepta los mismos valores que `code_theme` (un tema de Pygments o `custom`). Si
 hay también un `<!-- caption: -->`, ponlo **encima** del `<!-- code-theme: -->`.
 
 **Personalizar la paleta por defecto.** Edita el diccionario `CODE_PALETTE` cerca del
-principio de `md_to_pdf.py`: cada clave (`keyword`, `string`, `comment`,
+principio de `src/md_to_pdf.py`: cada clave (`keyword`, `string`, `comment`,
 `function`, `number`, `background`…) es un color hex que puedes cambiar a tu
 gusto. Los temas oscuros funcionan porque el `<pre>` interior es transparente y
 el fondo lo pinta el contenedor con el color del tema.
@@ -343,7 +343,7 @@ el fondo lo pinta el contenedor con el color del tema.
 
 ## Notas
 
-- Cabecera, pie, portada y cuerpo usan las fuentes incrustadas en `fonts/`, así
+- Cabecera, pie, portada y cuerpo usan las fuentes incrustadas en `assets/fonts/`, así
   que el resultado es idéntico en cualquier sistema sin instalar nada. Si el
   título es muy largo, la cabecera se recorta para no salirse del margen.
 - El PDF lleva metadatos de documento (título, autor y subtítulo).

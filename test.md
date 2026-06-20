@@ -23,11 +23,11 @@ automática de documentos [@perez2020].
 
 A continuación se muestra la primera imagen del documento:
 
-![Montaña nevada al amanecer](foto1.jpg)
+![Montaña nevada al amanecer](assets/img/foto1.jpg)
 
 Y la segunda imagen de esta sección:
 
-![Vista aérea de bosque](foto2.jpg)
+![Vista aérea de bosque](assets/img/foto2.jpg)
 
 ### Primera tabla de la sección
 
@@ -410,13 +410,13 @@ def keep_example():
 
 Esta imagen recibe la etiqueta **Figura 6.1**:
 
-![Perro de raza husky en la nieve](foto3.jpg)
+![Perro de raza husky en la nieve](assets/img/foto3.jpg)
 
 ### Segunda imagen de la sección
 
 Esta imagen recibe la etiqueta **Figura 6.2**:
 
-![Montaña nevada al amanecer](foto1.jpg)
+![Montaña nevada al amanecer](assets/img/foto1.jpg)
 
 El contador se reinicia en la siguiente sección (`##`), por lo que
 la primera imagen de la sección 7 será *Figura 7.1*.
@@ -460,7 +460,7 @@ son independientes:
 | A1        | B1        | C1        |
 | A2        | B2        | C2        |
 
-![Vista aérea de bosque](foto2.jpg)
+![Vista aérea de bosque](assets/img/foto2.jpg)
 
 Los elementos anteriores deben aparecer como **Tabla 7.1** y
 **Figura 7.1** respectivamente.
