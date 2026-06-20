@@ -1,467 +1,127 @@
 ---
-title: Documento de prueba integral
-subtitle: Verificación del conversor
-comment: Algo mas
-author: jfdg01
-locale: es
+title: Feature Showcase
+subtitle: A visual check of every general feature
+comment: md-to-pdf test document
+author: Test User
+logo: ../assets/img/logo_uja.webp
+locale: en
 bibliography: test_refs.bib
-citation_style: numeric
-logo: ./assets/img/logo_uja.webp
 ---
 
-## Introducción
+## Headings and numbering
 
-Este documento cubre todos los elementos que el conversor puede generar.
-Sirve como herramienta de verificación visual: cada sección comprueba
-un aspecto distinto del PDF resultante.
+Sections (`##`) start on a new page and are auto-numbered (`1.`, `2.`…). This
+document shows every general feature; document-wide options (locale, page size,
+code theme, citation style) live in the other test files.
 
-### Propósito
+### Subsection
 
-El objetivo es confirmar que portada, índice, cabecera, pie, fuentes,
-saltos de página y numeración automática de figuras y tablas funcionan
-correctamente. El enfoque sigue trabajos previos sobre evaluación
-automática de documentos [@perez2020].
+Auto-numbered `x.y`.
 
-A continuación se muestra la primera imagen del documento:
+#### Sub-subsection
 
-![Montaña nevada al amanecer](../assets/img/foto1.jpg)
+Auto-numbered `x.y.z`, and it reaches the default TOC depth.
 
-Y la segunda imagen de esta sección:
+##### Level-5 heading (not in the TOC by default)
 
-![Vista aérea de bosque](../assets/img/foto2.jpg)
+<!-- toc -->
+##### Forced into the TOC with `<!-- toc -->`
 
-### Primera tabla de la sección
+<!-- no-toc -->
+### Hidden from the TOC with `<!-- no-toc -->`
 
-<!-- caption: Checklist de elementos verificables del PDF -->
-| Elemento        | Estado esperado          | Notas                        |
-|-----------------|--------------------------|------------------------------|
-| Portada         | Título, autor, asignatura| Con logo si existe           |
-| Índice          | Secciones y subsecciones | Con hipervínculos            |
-| Cabecera/pie    | Título · Asignatura / Autor + pág. | Fuente embebida   |
-| Figuras         | Figura x.y bajo la imagen| Contador por sección         |
-| Tablas          | Tabla x.y encima         | Contador por sección         |
+## Text and links
 
-## Formato de texto
+**Bold**, *italic*, ***bold italic***, `inline code`, and an external
+[link to python.org](https://www.python.org). Internal TOC and bookmark links
+are generated automatically.
 
-El cuerpo admite el Markdown habitual.
+> A blockquote with **formatting**, `code`, and a second line that joins the
+> same visual block.
 
-### Énfasis
+A horizontal rule follows:
 
-- **Negrita** con doble asterisco.
-- *Cursiva* con un asterisco.
-- ***Negrita y cursiva*** combinadas.
-- ~~Tachado~~ (no soportado por el conversor, se muestra en bruto).
-- `código en línea` con acento grave.
+---
 
-### Párrafos y flujo
+## Lists
 
-Un párrafo normal tiene una separación cómoda con el siguiente.
-Este texto es suficientemente largo para comprobar que el interlineado
-de 1,6 y el tamaño de 13 pt resultan legibles en el PDF impreso.
+- Unordered item
+- Nested:
+  - Child A
+  - Child B
+    - Grandchild
+- Back to level one
 
-Segundo párrafo de la misma subsección, sin ninguna marca especial.
+1. Ordered step
+2. Another step
+   1. Sub-step 2.1
+   2. Sub-step 2.2
+3. Final step
 
-### Hipervínculos
+## Code blocks
 
-Un enlace externo: [Página de inicio de Python](https://www.python.org).
-Los hipervínculos del índice y del outline del PDF son internos y se
-generan automáticamente; no es necesario escribirlos a mano.
-
-## Listas
-
-### Lista no ordenada con guiones
-
-- Primer elemento de nivel 1
-- Segundo elemento de nivel 1
-  - Subelemento anidado A
-  - Subelemento anidado B
-    - Tercer nivel de anidamiento
-- Tercer elemento de nivel 1
-
-### Lista ordenada
-
-1. Paso uno
-2. Paso dos
-3. Paso tres
-   1. Subpaso 3.1
-   2. Subpaso 3.2
-4. Paso cuatro
-
-### Lista con texto largo
-
-- Este ítem tiene un texto deliberadamente largo para comprobar que el ajuste
-  de línea funciona correctamente dentro del elemento de lista sin romper
-  el sangrado ni el interlineado.
-- Ítem corto.
-- Otro ítem con **negrita** y `código` en línea mezclados con texto normal.
-
-## Bloques de código
-
-### Código sin lenguaje
-
-<!-- caption: Ejemplo de uso en línea de comandos -->
+<!-- caption: Plain block, no language -->
 ```
-$ md-to-pdf informe.md
-  informe.md → informe.pdf [OK, 142 KB]
+$ md-to-pdf report.md
+  report.md -> report.pdf [OK, 142 KB]
 ```
 
-### Python con resaltado de sintaxis
-
-<!-- caption: Función de numeración de figuras y tablas -->
+<!-- caption: Python with syntax highlighting -->
 ```python
-def add_figure_table_numbers(html):
-    section = [0]
-    figs = [0]
-    tabs = [0]
-    pattern = re.compile(r'<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>')
-
-    def sub(m):
-        tag = m.group(0)
-        lo = tag.lower()
-        if lo.startswith('<h2'):
-            section[0] += 1
-            figs[0] = 0
-            tabs[0] = 0
-            return tag
-        if lo.startswith('<img'):
-            figs[0] += 1
-            return f'<figure>{tag}<figcaption>Figura {section[0]}.{figs[0]}</figcaption></figure>'
-        return tag
-
-    return pattern.sub(sub, html)
+def fib(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a
 ```
 
-### Bash con tema propio (solarized-light)
+A per-block theme overrides the document theme via `<!-- code-theme: -->`:
 
-Este bloque lleva `<!-- code-theme: solarized-light -->` en la línea anterior a
-la valla, de modo que usa esa paleta en lugar del tema oscuro por defecto del documento.
-
-<!-- caption: Script de instalación (tema solarized-light) -->
-<!-- code-theme: solarized-light -->
-```bash
-# Instalar dependencias y lanzar la conversión
-cd ~/.local/scripts/md-to-pdf
-bash install.sh
-md-to-pdf documento.md
-```
-
-### JSON con tema propio (monokai)
-
-Y este otro usa `<!-- code-theme: monokai -->`: un tema oscuro. Compáralo con el
-bloque anterior y con los bloques oscuros por defecto para ver tres paletas
-distintas conviviendo en el mismo documento.
-
-<!-- caption: Parámetros de Page.printToPDF (tema monokai, oscuro) -->
+<!-- caption: JSON with a per-block monokai theme -->
 <!-- code-theme: monokai -->
 ```json
-{
-  "id": 1,
-  "method": "Page.printToPDF",
-  "params": {
-    "printBackground": true,
-    "paperWidth": 8.27,
-    "paperHeight": 11.69,
-    "marginTop": 1.15
-  }
-}
+{ "printBackground": true, "paperWidth": 8.27 }
 ```
 
-### Bloque de código largo (más de dos páginas)
-
-El siguiente bloque verifica que el conversor maneja correctamente bloques
-de código que superan el límite de una página. Además lleva `<!-- keep -->`,
-de modo que arranca pegado a este párrafo y, al no caber, se reparte entre
-páginas en lugar de empezar en una nueva.
+The `<!-- keep -->` marker pins the block to the previous paragraph:
 
 <!-- keep -->
-<!-- caption: Módulo CsvAnalyser — estadísticas descriptivas completas -->
+<!-- caption: Greeting function kept with its intro -->
 ```python
-"""
-Módulo de procesamiento de datos CSV con estadísticas descriptivas.
-Ejemplo extenso utilizado como caso de prueba para la paginación de
-bloques de código en el conversor md-to-pdf.
-"""
-
-from __future__ import annotations
-
-import csv
-import math
-import statistics
-from collections import defaultdict
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
-
-
-@dataclass
-class ColumnStats:
-    name: str
-    count: int = 0
-    missing: int = 0
-    numeric: bool = True
-    values: List[float] = field(default_factory=list)
-    categories: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
-
-    # ── Estadísticos numéricos ──────────────────────────────────────────────
-
-    @property
-    def mean(self) -> Optional[float]:
-        return statistics.mean(self.values) if self.values else None
-
-    @property
-    def median(self) -> Optional[float]:
-        return statistics.median(self.values) if self.values else None
-
-    @property
-    def stdev(self) -> Optional[float]:
-        return statistics.stdev(self.values) if len(self.values) > 1 else None
-
-    @property
-    def minimum(self) -> Optional[float]:
-        return min(self.values) if self.values else None
-
-    @property
-    def maximum(self) -> Optional[float]:
-        return max(self.values) if self.values else None
-
-    @property
-    def q1(self) -> Optional[float]:
-        if not self.values:
-            return None
-        s = sorted(self.values)
-        return statistics.median(s[: len(s) // 2])
-
-    @property
-    def q3(self) -> Optional[float]:
-        if not self.values:
-            return None
-        s = sorted(self.values)
-        mid = (len(s) + 1) // 2
-        return statistics.median(s[mid:])
-
-    @property
-    def iqr(self) -> Optional[float]:
-        q1, q3 = self.q1, self.q3
-        return q3 - q1 if q1 is not None and q3 is not None else None
-
-    def outliers(self, k: float = 1.5) -> List[float]:
-        """Devuelve los valores fuera del rango [Q1 - k·IQR, Q3 + k·IQR]."""
-        iqr = self.iqr
-        if iqr is None:
-            return []
-        lo = self.q1 - k * iqr
-        hi = self.q3 + k * iqr
-        return [v for v in self.values if v < lo or v > hi]
-
-    def histogram(self, bins: int = 10) -> List[Tuple[float, float, int]]:
-        """Devuelve una lista de (límite_inf, límite_sup, frecuencia)."""
-        if not self.values:
-            return []
-        lo, hi = self.minimum, self.maximum
-        if lo == hi:
-            return [(lo, hi, len(self.values))]
-        width = (hi - lo) / bins
-        counts = [0] * bins
-        for v in self.values:
-            idx = min(int((v - lo) / width), bins - 1)
-            counts[idx] += 1
-        return [(lo + i * width, lo + (i + 1) * width, c) for i, c in enumerate(counts)]
-
-    # ── Resumen ─────────────────────────────────────────────────────────────
-
-    def summary(self) -> Dict[str, Any]:
-        if self.numeric:
-            return {
-                "column":  self.name,
-                "type":    "numeric",
-                "count":   self.count,
-                "missing": self.missing,
-                "mean":    round(self.mean, 4) if self.mean is not None else None,
-                "median":  round(self.median, 4) if self.median is not None else None,
-                "stdev":   round(self.stdev, 4) if self.stdev is not None else None,
-                "min":     self.minimum,
-                "q1":      round(self.q1, 4) if self.q1 is not None else None,
-                "q3":      round(self.q3, 4) if self.q3 is not None else None,
-                "max":     self.maximum,
-                "outliers": len(self.outliers()),
-            }
-        top = sorted(self.categories.items(), key=lambda x: -x[1])[:5]
-        return {
-            "column":     self.name,
-            "type":       "categorical",
-            "count":      self.count,
-            "missing":    self.missing,
-            "unique":     len(self.categories),
-            "top_values": top,
-        }
-
-
-class CsvAnalyser:
-    """Lee un CSV y calcula estadísticas descriptivas por columna."""
-
-    def __init__(self, path: str | Path, delimiter: str = ",", encoding: str = "utf-8"):
-        self.path = Path(path)
-        self.delimiter = delimiter
-        self.encoding = encoding
-        self.columns: Dict[str, ColumnStats] = {}
-        self._row_count = 0
-        self._loaded = False
-
-    # ── Carga ────────────────────────────────────────────────────────────────
-
-    def load(self) -> "CsvAnalyser":
-        with self.path.open(encoding=self.encoding, newline="") as fh:
-            reader = csv.DictReader(fh, delimiter=self.delimiter)
-            if reader.fieldnames is None:
-                raise ValueError("El archivo CSV no tiene cabecera.")
-            for name in reader.fieldnames:
-                self.columns[name] = ColumnStats(name=name)
-            for row in reader:
-                self._row_count += 1
-                for name, raw in row.items():
-                    col = self.columns[name]
-                    col.count += 1
-                    if raw is None or raw.strip() == "":
-                        col.missing += 1
-                        continue
-                    try:
-                        col.values.append(float(raw))
-                    except ValueError:
-                        col.numeric = False
-                        col.categories[raw.strip()] += 1
-        self._loaded = True
-        return self
-
-    # ── Consultas ────────────────────────────────────────────────────────────
-
-    @property
-    def row_count(self) -> int:
-        return self._row_count
-
-    def numeric_columns(self) -> List[str]:
-        return [n for n, c in self.columns.items() if c.numeric]
-
-    def categorical_columns(self) -> List[str]:
-        return [n for n, c in self.columns.items() if not c.numeric]
-
-    def correlation(self, col_a: str, col_b: str) -> float:
-        """Coeficiente de correlación de Pearson entre dos columnas numéricas."""
-        a = self.columns[col_a].values
-        b = self.columns[col_b].values
-        n = min(len(a), len(b))
-        if n < 2:
-            return float("nan")
-        mean_a = sum(a[:n]) / n
-        mean_b = sum(b[:n]) / n
-        num = sum((a[i] - mean_a) * (b[i] - mean_b) for i in range(n))
-        den = math.sqrt(
-            sum((a[i] - mean_a) ** 2 for i in range(n))
-            * sum((b[i] - mean_b) ** 2 for i in range(n))
-        )
-        return num / den if den else float("nan")
-
-    def report(self) -> List[Dict[str, Any]]:
-        if not self._loaded:
-            raise RuntimeError("Llama a load() antes de report().")
-        return [col.summary() for col in self.columns.values()]
-
-    def __repr__(self) -> str:
-        status = f"{self._row_count} rows" if self._loaded else "not loaded"
-        return f"CsvAnalyser({self.path.name!r}, {status})"
+def greet(name):
+    return f"Hello, {name}!"
 ```
 
-### Bloque mantenido junto al texto previo
+## Tables
 
-El marcador `<!-- keep -->` (en la línea anterior al elemento) fuerza a este a
-permanecer en la misma página que el contenido precedente, en lugar de empujarlo
-a la página siguiente. El siguiente bloque de código debe quedar pegado a este
-párrafo:
+<!-- caption: Basic table -->
+| Name     | Type     | Default          |
+|----------|----------|------------------|
+| `margin` | `float`  | `1.15`           |
+| `font`   | `string` | `Source Serif 4` |
 
-<!-- keep -->
-<!-- caption: Bloque forzado a seguir al párrafo anterior -->
-```python
-def keep_example():
-    """Este bloque se mantiene junto al texto que lo introduce."""
-    return "permanece junto al párrafo previo"
-```
+<!-- caption: Column alignment -->
+| Left        | Center      | Right     |
+|:------------|:-----------:|----------:|
+| text        | text        | 1,234.56  |
+| longer text | longer text | 99.00     |
 
-## Tablas
+## Figures and cross-references
 
-### Tabla básica
+A caption via HTML comment:
 
-<!-- caption: Parámetros de configuración del conversor -->
-| Nombre   | Tipo     | Valor por defecto |
-|----------|----------|-------------------|
-| `margin` | `float`  | `1.15`            |
-| `font`   | `string` | `Source Serif 4`  |
-| `size`   | `int`    | `13`              |
+<!-- caption: A snowy mountain at dawn -->
+![Snowy mountain](../assets/img/foto1.jpg)
 
-### Tabla con alineación
+A caption taken from the image alt text:
 
-<!-- caption: Demostración de alineación de columnas -->
-| Izquierda    | Centro       | Derecha    |
-|:-------------|:------------:|----------:|
-| texto        | texto        | 1 234,56 € |
-| texto largo  | texto largo  | 99,00 €    |
-| A            | B            | 0,01 €     |
+![Aerial view of a forest](../assets/img/foto2.jpg)
 
-## Imágenes
+Counters reset each section, so the figures above are **Figure 6.1** and
+**Figure 6.2**. Reference them by number: see [[fig-6-1]] and [[fig-6-2]].
 
-### Primera imagen de la sección
+## Citations
 
-Esta imagen recibe la etiqueta **Figura 6.1**:
-
-![Perro de raza husky en la nieve](../assets/img/foto3.jpg)
-
-### Segunda imagen de la sección
-
-Esta imagen recibe la etiqueta **Figura 6.2**:
-
-![Montaña nevada al amanecer](../assets/img/foto1.jpg)
-
-El contador se reinicia en la siguiente sección (`##`), por lo que
-la primera imagen de la sección 7 será *Figura 7.1*.
-
-## Citas, separadores y elementos mixtos
-
-### Cita en bloque
-
-> Esta es una cita en bloque (*blockquote*). Puede contener **texto con
-> formato**, `código` e incluso varias líneas consecutivas que se unen
-> en un único bloque visual con borde izquierdo y fondo gris claro.
-
-> Segunda cita independiente, separada de la anterior.
-
-### Citas bibliográficas
-
-Las citas se escriben con `[@clave]` y se enlazan a la sección de
-**Referencias** (generada sola al final con las entradas citadas). Una cita
-suelta [@garcia2019] y varias juntas [@perez2020; @lopez2021] producen una
-única marca con todos los números. El estilo (`numeric` o `author-year`) se
-elige en el front matter con `citation_style`.
-
-### Separador horizontal
-
-El siguiente elemento es una línea horizontal (`---` en el Markdown):
-
----
-
-El texto continúa tras el separador. Observa que el conversor ignora
-el `---` inicial del documento (lo usa como separador portada/cuerpo),
-pero dentro del cuerpo produce el `<hr>` habitual.
-
-### Tabla e imagen en la misma sección
-
-Esta sección tiene los dos tipos para verificar que los contadores
-son independientes:
-
-<!-- caption: Tabla de datos de ejemplo con tres columnas -->
-| Columna 1 | Columna 2 | Columna 3 |
-|-----------|-----------|-----------|
-| A1        | B1        | C1        |
-| A2        | B2        | C2        |
-
-![Vista aérea de bosque](../assets/img/foto2.jpg)
-
-Los elementos anteriores deben aparecer como **Tabla 7.1** y
-**Figura 7.1** respectivamente.
+Citations use `[@key]` and link to the auto-generated **References** section,
+which lists only the cited entries. A single citation [@smith2020] and a grouped
+one [@brown2018; @lee2021] render numeric markers by default.

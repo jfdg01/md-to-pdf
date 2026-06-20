@@ -1,404 +1,276 @@
 # md-to-pdf
 
-Convierte ficheros Markdown en un PDF con **portada**, **índice navegable**,
-**índices de figuras/tablas/código** y **cabecera/pie** en cada página. Sirve para
-informes, manuales, apuntes o cualquier documento estructurado.
+Turn Markdown into a polished PDF with a **cover page**, a **navigable table of
+contents**, **lists of figures/tables/code blocks**, and a **running
+header/footer** on every page. Good for reports, manuals, notes, or any
+structured document.
 
-El render lo hace **WeasyPrint** (Python puro, sin navegador): rápido, ligero y
-con el mismo resultado en cualquier máquina. Las fuentes (Source Serif 4, Space
-Grotesk, Space Mono) viajan con el repositorio en `assets/fonts/`.
+Rendering is done by **WeasyPrint** (pure Python, no browser): fast, light, and
+identical on every machine. The fonts (Source Serif 4, Space Grotesk, Space
+Mono) ship with the repo in `assets/fonts/`.
 
 ---
 
-## Requisitos
+## Requirements
 
-- **Python 3** (3.10+).
-- **[uv](https://docs.astral.sh/uv/)** para gestionar el entorno y las
-  dependencias. Si no lo tienes:
+- **Python 3.10+**
+- **[uv](https://docs.astral.sh/uv/)** to manage the environment and
+  dependencies:
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh   # Linux/macOS
   # Windows: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
   ```
-- Las librerías de sistema de WeasyPrint (Pango/Cairo). En Ubuntu/Debian:
+- WeasyPrint's system libraries (Pango/Cairo). On Ubuntu/Debian:
   ```bash
   sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0
   ```
-  En Windows se instalan con WeasyPrint según su documentación (GTK runtime).
+  On Windows, install them via WeasyPrint's docs (GTK runtime).
 
-Las dependencias de Python (`markdown`, `weasyprint`, `pypdf`, `watchdog`,
-`pygments`, `pybtex`) se declaran en `pyproject.toml` y se fijan en `uv.lock`; `uv sync` las instala en un
-entorno virtual propio (`.venv/`) de forma reproducible.
+Python dependencies (`markdown`, `weasyprint`, `pypdf`, `watchdog`, `pygments`,
+`pybtex`) are declared in `pyproject.toml` and pinned in `uv.lock`. `uv sync`
+installs them into a project-local virtual environment (`.venv/`).
 
 ---
 
-## Instalación
+## Installation
 
-El instalador llama a `uv sync` (crea el `.venv` e instala las dependencias del
-lockfile) y registra el comando global `md-to-pdf`.
+The installer runs `uv sync` and registers the global `md-to-pdf` command.
 
-### Linux / Ubuntu
+**Linux / macOS**
 ```bash
-cd ~/.local/scripts        # o donde tengas clonado el repo
-bash install.sh
+cd /path/to/md-to-pdf
+bash install.sh        # links md-to-pdf into ~/.local/bin
 ```
-Esto enlaza `md-to-pdf` en `~/.local/bin`. Asegúrate de que ese directorio está
-en tu `PATH` (si no, añade a `~/.bashrc`):
+Make sure `~/.local/bin` is on your `PATH` (add to `~/.bashrc` if needed):
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### Windows
+**Windows**
 ```powershell
-cd $env:USERPROFILE\Documents\md-to-pdf   # ruta del repo
-.\install.ps1
+cd C:\path\to\md-to-pdf
+.\install.ps1          # add the repo folder to your user PATH, then open a new terminal
 ```
-Añade la carpeta del repo al `PATH` de usuario. **Abre una terminal nueva** para
-que el comando `md-to-pdf` quede disponible.
 
-> El `.venv/` es propio de cada máquina y está en `.gitignore`. Ejecuta el
-> instalador una vez por equipo tras clonar.
+> The `.venv/` is per-machine and git-ignored. Run the installer once per
+> machine after cloning.
 
 ---
 
-## Uso
+## Usage
 
 ```bash
-# Convierte UN fichero (genera informe.pdf junto al .md)
-md-to-pdf informe.md
-
-# Convierte VARIOS ficheros
-md-to-pdf tema1.md tema2.md
-
-# Convierte TODOS los .md de un directorio (sin recursión)
-md-to-pdf apuntes/
-
-# El directorio actual también vale
-md-to-pdf .
+md-to-pdf report.md              # -> report.pdf next to the source
+md-to-pdf a.md b.md              # several files
+md-to-pdf notes/                 # every .md in a directory (no recursion)
+md-to-pdf report.md -o final.pdf # choose the output name/path
+md-to-pdf --watch report.md      # rebuild on every save (Ctrl-C to stop)
 ```
 
-Cada PDF se escribe junto a su `.md` de origen, con el mismo nombre.
-
-### Nombre del PDF de salida (`-o` / `--output`)
-
-Por defecto el PDF se llama igual que el `.md` y se escribe junto a él. Para
-elegir otro nombre o ruta, usa `-o` (o `--output`). Funciona delante o detrás del
-fichero de entrada:
-
-```bash
-# Elige el nombre del PDF generado
-md-to-pdf informe.md -o memoria-final.pdf
-
-# El orden de los argumentos da igual; admite también una ruta
-md-to-pdf -o /tmp/salida.pdf informe.md
-```
-
-`-o` **solo se aplica al convertir un único `.md`**: si pasas varios ficheros o un
-directorio, no se puede dar un mismo nombre a todos, así que se avisa por consola
-y la opción se ignora (cada PDF se escribe junto a su `.md`).
-
-### Modo vigilancia (`--watch`)
-
-Con `--watch`, el conversor se queda observando y **regenera el PDF cada vez que
-guardas** el `.md`, con el mismo formato de salida que la conversión única:
-
-```bash
-# Vigila solo un fichero
-md-to-pdf --watch informe.md
-
-# Vigila un directorio entero (incluidos los .md que crees después)
-md-to-pdf --watch apuntes/
-```
-
-Hace una conversión inicial al arrancar y aplica un pequeño *debounce* para no
-regenerar dos veces ante guardados muy seguidos. Sal con **Ctrl-C**.
+Each PDF is written next to its `.md` with the same name, unless `-o`/`--output`
+is given. `-o` only applies to a single `.md`; with several files or a
+directory it is ignored with a warning. `--watch` does an initial build, then
+rebuilds on save (with a small debounce); it also watches directories for new
+`.md` files.
 
 ---
 
-## Cómo estructurar el Markdown
+## Document structure
 
-El documento empieza con un bloque de **front matter** (metadatos `clave: valor`
-entre líneas `---`), seguido del **cuerpo**:
+A document starts with a **front matter** block (`key: value` pairs between
+`---` lines), followed by the **body**:
 
 ```markdown
 ---
-title: Título del documento
-subtitle: Un subtítulo opcional
-comment: Una línea libre (fecha, curso, nota…)
-author: Tu Nombre
-logo: imagenes/portada.png
-locale: es
+title: Document title
+subtitle: An optional subtitle
+author: Your Name
+logo: images/cover.png
 ---
 
-## Introducción
+## Introduction
 
-Texto de la primera sección...
+First section...
 
-### Un subapartado
+### A subsection
 
-Más texto...
-
-## Siguiente sección
-
-...
+More text...
 ```
 
-Las secciones se numeran solas (ver más abajo), así que **no escribas el número**
-en los encabezados.
+Sections are numbered automatically, so **don't write the number** in headings.
+If `title` is omitted, the first `# ` heading in the body is used.
 
-### Metadatos del front matter
+### Front matter keys
 
-| Clave      | Para qué sirve                                            | Aparece en        |
-|------------|----------------------------------------------------------|-------------------|
-| `title`    | Título del documento (único obligatorio)                 | Portada + cabecera|
-| `subtitle` | Subtítulo en cursiva                                      | Portada + cabecera|
-| `comment`  | Línea libre adicional (fecha, curso, nota…)              | Portada           |
-| `author`   | Autor                                                     | Portada + pie     |
-| `logo`     | Ruta a **cualquier** imagen para la portada              | Portada           |
-| `locale`   | `es` (def.) o `en`: idioma de "Figura/Figure", índices…  | Todo el documento |
-| `code_theme`| Paleta de resaltado de código (ver más abajo)           | Bloques de código |
-| `numbering`| Numera las secciones automáticamente (def. `true`; `false` lo desactiva) | Secciones + índice |
-| `toc_depth`| Nivel máximo en el índice: `3` (`###`), `4` (`####`, def.) o `5` (`#####`) | Índice + marcadores |
-| `page_size`| Tamaño de página: `a4` (def.), `a5`, `a3`, `letter`, `legal`… | Todo el documento |
-| `orientation`| `portrait` (def.) o `landscape`                         | Todo el documento |
-| `margins`  | Márgenes del cuerpo en CSS (`1.15in 0.85in 0.95in 0.85in`) | Todo el documento |
-| `bibliography`| Ruta a un fichero `.bib` (BibTeX) para citas y referencias | Sección «Referencias» |
-| `citation_style`| `numeric` (def., `[1]`) o `author-year` (`(Pérez, 2020)`) | Marcas de cita |
+| Key              | Purpose                                                        | Shows in            |
+|------------------|----------------------------------------------------------------|---------------------|
+| `title`          | Document title (the only required key)                         | Cover + header      |
+| `subtitle`       | Italic subtitle                                                | Cover + header      |
+| `comment`        | Free extra line (date, course, note…)                          | Cover               |
+| `author`         | Author                                                         | Cover + footer      |
+| `logo`           | Path to **any** image for the cover (`none` disables it)       | Cover               |
+| `locale`         | `es` (default) or `en`: language of "Figure"/"Table", indexes  | Whole document      |
+| `code_theme`     | Syntax-highlight palette (see below)                           | Code blocks         |
+| `numbering`      | Auto-number sections (default `true`; `false` to disable)      | Sections + TOC      |
+| `toc_depth`      | Deepest TOC level: `3` (`###`), `4` (`####`, default), `5`     | TOC + bookmarks     |
+| `page_size`      | `a4` (default), `a5`, `a3`, `letter`, `legal`, `b5`, `ledger`… | Whole document      |
+| `orientation`    | `portrait` (default) or `landscape`                           | Whole document      |
+| `margins`        | Body margins as CSS (`1.15in 0.85in 0.95in 0.85in`)           | Whole document      |
+| `bibliography`   | Path to a `.bib` (BibTeX) file for citations                  | "References" section|
+| `citation_style` | `numeric` (default, `[1]`) or `author-year` (`(Smith, 2020)`) | Citation markers    |
+| `*_size`         | Per-section font sizes (see Font sizes)                        | The matching part   |
 
-Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`,
-`numeracion`, `profundidad_indice`, `tamaño`, `orientacion`, `margenes`,
-`bibliografia`, `estilo_cita`…).
-Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no defines
-`logo`, la portada no lleva imagen; con `logo: none` también lo desactivas
-explícitamente.
+Spanish aliases are accepted (`titulo`, `autor`, `imagen`, `idioma`,
+`numeracion`, `tamaño`, `orientacion`, `margenes`, `bibliografia`,
+`estilo_cita`…). Margins can also be set per side with `margin_top`,
+`margin_right`, `margin_bottom`, `margin_left`.
 
-### Reglas del cuerpo
+### Body rules
 
-- **`## ` = sección.** Cada encabezado de nivel 2 empieza en una **página nueva**.
-  Se numeran solas (`1.`, `2.`…); no escribas el número a mano (ver abajo).
-- **`### ` = subsección.** No fuerza salto de página.
-- **`#### ` y `##### ` = sub-subsección y nivel 5.** También se numeran solos
-  (`1.1.1`, `1.1.1.1`).
-- **El índice** lista automáticamente los `##`, `###` y `####` (hasta el nivel
-  `toc_depth`, def. `####`), con enlaces que saltan a la sección al hacer clic, y
-  el PDF incluye **marcadores** con esa jerarquía (ver «Profundidad del índice»).
-- Funciona el Markdown habitual: **negrita**, *cursiva*, listas, tablas, `código`
-  en línea y bloques con triple acento grave, citas.
+- **`## ` = section**, and starts on a **new page**.
+- **`### `/`#### `/`##### ` = subsections**, no page break.
+- Sections are numbered automatically (`1.`, `1.1`, `1.1.1`…). Disable with
+  `numbering: false` if your text already carries the numbers.
+- The **TOC** lists headings up to `toc_depth` (default `####`) with clickable
+  links; the PDF gets matching **bookmarks**.
+- Standard Markdown works: **bold**, *italic*, lists, tables, `inline code`,
+  fenced code blocks, blockquotes, links, horizontal rules.
 
-### Numeración automática de secciones
+### Per-heading TOC control
 
-Por defecto el conversor numera las secciones por ti: los `##` reciben `1.`,
-`2.`, `3.`…, los `###` su `1.1`, `1.2`…, los `####` su `1.1.1` y los `#####` su
-`1.1.1.1`. El número aparece igual en el cuerpo, en el índice de contenidos y en
-los marcadores del PDF, así que **no lo escribas a mano** en los encabezados. Si
-tu documento ya trae la numeración escrita, desactívala con `numbering: false`
-para no duplicarla.
-
-### Profundidad del índice
-
-El índice de contenidos (y los marcadores del PDF) llega por defecto hasta los
-`####` (nivel 4); los `#####` no aparecen. Cámbialo para **todo el documento** con
-`toc_depth` en el front matter:
-
-```yaml
-toc_depth: 5   # incluye también los #####  (3 = solo hasta ###)
-```
-
-Y para un encabezado **concreto**, pon un comentario en la línea de encima:
+Put a comment on the line above a heading to override `toc_depth` for it:
 
 ```markdown
 <!-- toc -->
-##### Apartado que sí quiero en el índice
+##### Force this deep heading into the TOC
 
 <!-- no-toc -->
-### Apartado que NO quiero en el índice
+### Keep this one out of the TOC
 ```
 
-`<!-- toc -->` fuerza la entrada de ese encabezado aunque su nivel exceda
-`toc_depth`; `<!-- no-toc -->` la excluye aunque su nivel sí entre. Ambas marcas
-afectan por igual al índice y a los marcadores del PDF.
+Both marks affect the TOC and the PDF bookmarks alike.
 
-### Referencias cruzadas
+### Figures, tables, and code blocks
 
-Para enlazar a una figura, tabla o bloque de código por su número, escribe su
-ancla entre dobles corchetes: `[[fig-2-1]]`, `[[tab-2-1]]` o `[[code-2-1]]` (el
-formato es `tipo-sección-índice`, las mismas anclas que se numeran solas). Se
-convierte en un enlace cuyo texto visible es el número del elemento («Figura
-2.1») y que salta a él al hacer clic. Si el ancla no existe, se avisa por consola
-y la marca se deja tal cual para que la localices.
+These are numbered **Figure x.y**, **Table x.y**, **Code block x.y** (where *x*
+is the section and *y* the counter within it, reset each section). Each type
+gets its own list at the start of the document.
 
-### Citas y bibliografía
-
-Para citar fuentes, indica un fichero **BibTeX** en el front matter con
-`bibliography:` (ruta relativa al `.md`, igual que `logo:`) y escribe las citas
-en el cuerpo con `[@clave]`:
+**Every figure, table, and code block must have a caption**, or the converter
+refuses to build the PDF. Add it with an HTML comment on the line just above:
 
 ```markdown
----
-title: Mi informe
-bibliography: refs.bib
-citation_style: numeric   # numeric (def.) | author-year
----
-
-## Introducción
-
-El método sigue trabajos previos [@perez2020]. Otros lo amplían
-[@garcia2019; @lopez2021].
+<!-- caption: Overall system architecture -->
+![Block diagram](blocks.png)
 ```
 
-Con un `refs.bib` como:
+Images may instead use their alt text (`![alt](img)`) as the caption.
 
-```bibtex
-@article{perez2020,
-  author  = {Pérez, Juan Manuel and García, Ana},
-  title   = {Métodos de evaluación automática},
-  journal = {Revista de Computación},
-  year    = {2020},
-}
-@book{garcia2019,
-  author    = {García, Ana},
-  title     = {Fundamentos de sistemas},
-  publisher = {Editorial Técnica},
-  year      = {2019},
-}
-```
+### Cross-references
 
-Cada `[@clave]` se sustituye por una **marca enlazada** que salta a su entrada:
+Link to a figure/table/code block by its number with double brackets:
+`[[fig-2-1]]`, `[[tab-2-1]]`, `[[code-2-1]]` (format: `type-section-index`). It
+becomes a link whose visible text is the number ("Figure 2.1"). Unknown anchors
+are left untouched and reported on the console.
 
-- `citation_style: numeric` (por defecto) → `[1]`, y varias juntas → `[2, 3]`.
-- `citation_style: author-year` → `(Pérez y García, 2020)`, y varias →
-  `(García, 2019; López et al., 2021)`.
+### Keep with previous
 
-Al final del documento se genera sola una sección **«Referencias»**
-(«References» en `locale: en`) con **solo las entradas citadas**, formateadas de
-forma consistente. Es una sección normal: **se numera** como una más (`8.
-Referencias`) y aparece en el índice y en los marcadores del PDF. El orden es por
-aparición (numeric) o alfabético por autor (author-year).
-
-Si una `[@clave]` no está en el `.bib`, se avisa por consola y la marca se deja
-visible (`[@clave]`) para que la localices. Si el nombre de `citation_style` es
-desconocido, se avisa y se usa `numeric`. Las citas dentro de bloques o de
-`código en línea` no se tocan.
-
-### Tamaño de página y márgenes
-
-Por defecto el documento es **A4 vertical**. Para cambiarlo, usa estas claves del
-front matter:
-
-- `page_size`: `a4` (def.), `a5`, `a3`, `letter`, `legal`, `b5`, `ledger`…
-- `orientation`: `portrait` (def.) o `landscape`.
-- `margins`: los márgenes del cuerpo como valor CSS (`top right bottom left`),
-  p. ej. `margins: 1.15in 0.85in 0.95in 0.85in` o `margins: 2cm`. También puedes
-  fijarlos por lado con `margin_top`, `margin_right`, `margin_bottom` y
-  `margin_left` (los lados que no indiques conservan el valor por defecto).
+Put `<!-- keep -->` on the line above an element to force it onto the same page
+as the preceding content (instead of pushing it to the next page). If it
+doesn't fit whole, it splits. Useful so a code block stays with its intro text.
 
 ```markdown
----
-title: Apuntes en apaisado
-page_size: letter
-orientation: landscape
-margins: 1in 1.25in
----
-```
-
-El tamaño y la orientación se aplican a **portada, índices y cuerpo** por igual.
-Si el tamaño o la orientación son desconocidos, se avisa por consola y se usa el
-valor por defecto (A4 / vertical).
-
-### Listas
-
-Usa el guion (`-`) como marcador y **no dejes líneas en blanco entre los
-elementos** de una misma lista (eso produce espaciado de párrafo entre puntos).
-
-### Imágenes, tablas y bloques de código
-
-Se numeran como **Figura x.y**, **Tabla x.y** y **Bloque de código x.y**, donde
-*x* es la sección (`##`) e *y* el índice dentro de ella (los contadores se
-reinician en cada sección). Cada tipo tiene su propio índice al inicio.
-
-**Toda figura, tabla y bloque de código debe llevar descripción**, o el conversor
-se niega a generar el PDF (evita "Tabla x.y" vacías). La descripción se escribe
-con un comentario HTML en la línea inmediatamente anterior:
-
-```markdown
-<!-- caption: Arquitectura general del sistema -->
-![Diagrama de bloques](bloques.png)
-```
-
-- Las **imágenes** pueden usar su texto alternativo (`![texto](img)`) como
-  descripción si no hay `<!-- caption: -->`.
-- El comentario es invisible en cualquier otro visor de Markdown.
-
-### Mantener un elemento junto al anterior
-
-Coloca `<!-- keep -->` en la línea anterior a un elemento para forzarlo a quedarse
-en la misma página que el contenido previo (en lugar de empujarlo a la siguiente).
-Si no cabe entero, el propio elemento se parte. Útil para que un bloque de código
-no se separe del texto que lo introduce.
-
-```markdown
-Como muestra la siguiente función:
+Like the following function:
 
 <!-- keep -->
-<!-- caption: Función principal -->
+<!-- caption: Main entry point -->
 ` ``python
 def main():
     ...
 ` ``
 ```
 
-### Resaltado de código: paletas y temas
+### Citations and bibliography
 
-El color del resaltado de sintaxis se controla a **dos niveles**.
-
-**1. Tema de todo el documento — `code_theme` en el front matter.** Acepta:
-
-- *(vacío)* o `custom` → la **paleta oscura apagada personalizada** (gris pizarra
-  con acentos desaturados) definida en `src/md_to_pdf.py`. Es el valor por defecto.
-- El nombre de **cualquier tema de Pygments**: `monokai`, `dracula`,
-  `github-dark`, `solarized-light`, `solarized-dark`, `nord`, `gruvbox-dark`,
-  `friendly`, `default`… (lista completa: `python -m pygments -L styles`).
+Point `bibliography:` at a **BibTeX** file (path relative to the `.md`, like
+`logo:`) and cite in the body with `[@key]` (group several as `[@a; @b]`):
 
 ```markdown
 ---
-title: Mi documento
-code_theme: monokai
+title: My report
+bibliography: refs.bib
+citation_style: numeric   # numeric (default) | author-year
+---
+
+## Introduction
+
+The method builds on prior work [@smith2020; @brown2018].
+```
+
+Each `[@key]` becomes a linked marker — `[1]` (numeric) or `(Smith, 2020)`
+(author-year) — that jumps to its entry. A **References** section
+("Referencias" with `locale: es`) is generated automatically with only the
+cited entries; it is a normal numbered section and appears in the TOC and
+bookmarks. Order is by appearance (numeric) or alphabetical by author
+(author-year). Missing keys are reported and left visible.
+
+### Page size and margins
+
+Defaults to **A4 portrait**. Override with `page_size`, `orientation`, and
+`margins`:
+
+```markdown
+---
+title: Landscape notes
+page_size: letter
+orientation: landscape
+margins: 1in 1.25in
 ---
 ```
 
-Si el nombre no existe, se avisa por consola y se usa la paleta personalizada.
+These apply to cover, indexes, and body alike. Unknown values are reported and
+fall back to the default.
 
-**2. Tema por bloque — `<!-- code-theme: NOMBRE -->`.** Colócalo en la línea
-inmediatamente anterior a la valla ` ``` ` para que **ese bloque concreto** use
-una paleta distinta de la del documento. Así pueden convivir varias paletas en
-un mismo PDF:
+### Syntax highlighting
+
+Controlled at two levels.
+
+**1. Whole document — `code_theme` in the front matter.** Accepts:
+
+- *(empty)* or `custom` → the bundled **muted dark palette** (slate-grey
+  background, desaturated accents) defined in `src/md_to_pdf.py`. Default.
+- Any **Pygments theme**: `monokai`, `dracula`, `github-dark`,
+  `solarized-light`, `nord`, `gruvbox-dark`, `friendly`… (full list:
+  `python -m pygments -L styles`).
+
+**2. Per block — `<!-- code-theme: NAME -->`** on the line just above a fence,
+so one block can use a different palette from the document. If a `<!-- caption:
+-->` is also present, put it **above** the `<!-- code-theme: -->`.
 
 ```markdown
-<!-- caption: Configuración (tema oscuro) -->
+<!-- caption: Config (dark theme) -->
 <!-- code-theme: monokai -->
 ` ``json
 { "printBackground": true }
 ` ``
 ```
 
-Acepta los mismos valores que `code_theme` (un tema de Pygments o `custom`). Si
-hay también un `<!-- caption: -->`, ponlo **encima** del `<!-- code-theme: -->`.
+To customize the default palette, edit the `CODE_PALETTE` dict near the top of
+`src/md_to_pdf.py` (each key is a hex color).
 
-**Personalizar la paleta por defecto.** Edita el diccionario `CODE_PALETTE` cerca del
-principio de `src/md_to_pdf.py`: cada clave (`keyword`, `string`, `comment`,
-`function`, `number`, `background`…) es un color hex que puedes cambiar a tu
-gusto. Los temas oscuros funcionan porque el `<pre>` interior es transparente y
-el fondo lo pinta el contenedor con el color del tema.
+### Font sizes
+
+Per-section font sizes can be set in the front matter: `text_size`,
+`title_size`, `h1_size`…`h6_size`, `code_size`, `table_size`. A bare number is
+points (`14` → `14pt`); any CSS unit (`1.2em`, `12px`) is kept as-is.
 
 ---
 
-## Notas
+## Notes
 
-- Cabecera, pie, portada y cuerpo usan las fuentes incrustadas en `assets/fonts/`, así
-  que el resultado es idéntico en cualquier sistema sin instalar nada. Si el
-  título es muy largo, la cabecera se recorta para no salirse del margen.
-- El PDF lleva metadatos de documento (título, autor y subtítulo).
-- Al convertir varios ficheros, si uno falla se informa con `[ERROR: …]` y se
-  continúa con el resto; el comando termina con código distinto de cero si hubo
-  algún fallo.
-- El tamaño de página es A4 por defecto, configurable con `page_size`,
-  `orientation` y `margins` (ver arriba).
+- Header, footer, cover, and body use the embedded fonts in `assets/fonts/`, so
+  output is identical anywhere with nothing to install. Long titles are clipped
+  in the header so they stay within the margin.
+- The PDF carries document metadata (title, author, subtitle).
+- When converting several files, a failure is reported with `[ERROR: …]` and the
+  rest continue; the command exits non-zero if anything failed.

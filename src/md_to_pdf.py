@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-MD → PDF, render puro en Python con WeasyPrint (sin navegador).
+MD -> PDF, pure-Python rendering with WeasyPrint (no browser).
 
-Uso: python3 md_to_pdf.py                 (convierte todos los .md del directorio)
-     python3 md_to_pdf.py f1.md f2.md ...  (convierte los archivos indicados)
+Usage: python3 md_to_pdf.py file.md ...   (converts the given files)
+       python3 md_to_pdf.py directory/    (converts every .md in the directory)
 
-Genera, por cada .md, un PDF con portada + índice navegable + índices de
-figuras/tablas/código + cuerpo, con cabecera/pie y marcadores (outline).
-Requiere: weasyprint, python-markdown, pypdf (todo pip, sin Chrome).
+For each .md it builds a PDF with a cover + navigable table of contents +
+lists of figures/tables/code blocks + body, with a running header/footer and
+bookmarks (outline).
+Requires: weasyprint, python-markdown, pypdf (all pip, no Chrome).
 """
 import base64
 import io
@@ -38,16 +39,16 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT_DIR = SCRIPT_DIR.parent            # raíz del repo (src/ cuelga de aquí)
-ASSETS_DIR = ROOT_DIR / "assets"        # fuentes e imágenes empaquetadas
+ROOT_DIR = SCRIPT_DIR.parent            # repo root (src/ hangs off this)
+ASSETS_DIR = ROOT_DIR / "assets"        # bundled fonts and images
 FONTS_DIR = ASSETS_DIR / "fonts"
 
-# Tamaño y márgenes del cuerpo por defecto (TODO #5: ambos configurables desde el
-# front matter). DEFAULT_MARGINS va por lado: top right bottom left.
+# Default body size and margins (both configurable from the front matter).
+# DEFAULT_MARGINS is per side: top right bottom left.
 PAGE_MARGIN = "1.15in 0.85in 0.95in 0.85in"
 DEFAULT_MARGINS = ("1.15in", "0.85in", "0.95in", "0.85in")
 
-# Tamaños de página admitidos (clave normalizada → palabra clave CSS de WeasyPrint).
+# Supported page sizes (normalized key -> WeasyPrint CSS keyword).
 PAGE_SIZES = {
     "a3": "A3", "a4": "A4", "a5": "A5",
     "b4": "B4", "b5": "B5",
@@ -89,11 +90,11 @@ def get_strings(lang):
 
 
 def _truthy(val):
-    """Interpreta un valor de front matter como booleano (true/false, sí/no…)."""
+    """Interpret a front-matter value as a boolean (true/false, yes/no…)."""
     return str(val).strip().lower() in ("true", "1", "yes", "si", "sí", "on")
 
 
-# ─────────────────────────── Fuentes ───────────────────────────
+# ─────────────────────────── Fonts ───────────────────────────
 
 def _face(family, rel, weight, style):
     path = FONTS_DIR / rel
@@ -108,9 +109,9 @@ def _face(family, rel, weight, style):
 
 
 def font_face_css():
-    """Fuentes embebidas (estáticas, para evitar rarezas con variables en
-    WeasyPrint). WeasyPrint sí respeta @font-face también en la cabecera/pie,
-    así que ya no hace falta estampar nada por separado."""
+    """Embedded fonts (static, to avoid quirks with variable fonts in
+    WeasyPrint). WeasyPrint honours @font-face in the header/footer too, so
+    nothing needs to be stamped separately."""
     serif = "Source_Serif_4/static"
     grot = "Space_Grotesk/static"
     mono = "Space_Mono"
@@ -130,31 +131,31 @@ def font_face_css():
     return "".join(rules)
 
 
-# ─────────────────────── Paleta de resaltado de código ───────────────────────
-# Paleta personalizada editable: cambia estos colores a tu gusto. Se usa cuando
-# el front matter lleva `code_theme: custom` (o no lleva ninguno). Para usar un
-# tema de Pygments ya hecho, pon `code_theme: monokai` (dracula, github-dark,
-# solarized-light, friendly, nord, gruvbox-dark, etc.).
+# ─────────────────────── Code-highlight palette ───────────────────────
+# Editable custom palette: change these colors to taste. Used when the front
+# matter has `code_theme: custom` (or none at all). To use a ready-made Pygments
+# theme, set `code_theme: monokai` (dracula, github-dark, solarized-light,
+# friendly, nord, gruvbox-dark, etc.).
 
-# Gama oscura apagada: tonos desaturados sobre un fondo gris pizarra, con buen
-# contraste pero sin colores chillones. Pensada para lectura cómoda en impreso.
+# Muted dark range: desaturated tones on a slate-grey background, good contrast
+# without garish colors. Designed for comfortable reading in print.
 CODE_PALETTE = {
-    "background": "#21252b",   # fondo del bloque, gris pizarra oscuro
-    "text":       "#c5cad3",   # texto por defecto, gris claro suave
-    "comment":    "#6b7480",   # comentarios, gris medio apagado (cursiva)
-    "keyword":    "#b48ead",   # palabras clave (def, return, if…), malva apagado
-    "builtin":    "#81a1c1",   # funciones/constantes integradas, azul apagado
-    "name":       "#c5cad3",   # identificadores, gris claro suave
-    "function":   "#88c0d0",   # nombres de función/clase, cian apagado
-    "string":     "#a3be8c",   # cadenas de texto, verde salvia apagado
-    "number":     "#d08770",   # números, naranja terroso apagado
-    "operator":   "#b48ead",   # operadores (+, =, ->), malva apagado
-    "error":      "#bf616a",   # tokens erróneos, rojo apagado
+    "background": "#21252b",   # block background, dark slate grey
+    "text":       "#c5cad3",   # default text, soft light grey
+    "comment":    "#6b7480",   # comments, muted medium grey (italic)
+    "keyword":    "#b48ead",   # keywords (def, return, if…), muted mauve
+    "builtin":    "#81a1c1",   # builtin functions/constants, muted blue
+    "name":       "#c5cad3",   # identifiers, soft light grey
+    "function":   "#88c0d0",   # function/class names, muted cyan
+    "string":     "#a3be8c",   # string literals, muted sage green
+    "number":     "#d08770",   # numbers, muted earthy orange
+    "operator":   "#b48ead",   # operators (+, =, ->), muted mauve
+    "error":      "#bf616a",   # error tokens, muted red
 }
 
 
 def _build_custom_style(palette):
-    """Crea una clase Style de Pygments a partir del dict CODE_PALETTE."""
+    """Build a Pygments Style class from the CODE_PALETTE dict."""
     return type("CustomCodeStyle", (Style,), {
         "background_color": palette["background"],
         "styles": {
@@ -180,33 +181,33 @@ CUSTOM_CODE_STYLE = _build_custom_style(CODE_PALETTE)
 
 
 def _style_fg(style):
-    """Color de texto por defecto de un tema de Pygments (`#rrggbb`). Se pasa
-    como `prestyles` al HtmlFormatter: con `noclasses` Pygments solo colorea los
-    tokens resaltados, así que el texto plano (bloques sin lenguaje o fragmentos
-    no resaltados) heredaría el color oscuro del cuerpo y quedaría ilegible sobre
-    fondos oscuros; este color base, fijado en el `<pre>`, lo evita."""
+    """Default text color of a Pygments theme (`#rrggbb`). Passed as `prestyles`
+    to the HtmlFormatter: with `noclasses`, Pygments only colors highlighted
+    tokens, so plain text (blocks with no language or unhighlighted fragments)
+    would inherit the body's dark color and become unreadable on dark
+    backgrounds; this base color, set on the `<pre>`, prevents that."""
     color = style.style_for_token(Text).get("color")
     return f"#{color}" if color else "#1a1a1a"
 
 
 def resolve_code_style(name):
-    """Resuelve el campo `code_theme`: devuelve la clase Style personalizada si
-    está vacío o vale 'custom'; en otro caso, el tema de Pygments con ese nombre.
-    Si el nombre no existe, avisa y cae en la paleta personalizada."""
+    """Resolve the `code_theme` field: return the custom Style class if it is
+    empty or equal to 'custom'; otherwise the Pygments theme with that name. If
+    the name does not exist, warn and fall back to the custom palette."""
     name = (name or "").strip().lower()
     if name in ("", "custom", "default"):
         return CUSTOM_CODE_STYLE
     try:
         return get_style_by_name(name)
     except ClassNotFound:
-        print(f"    (aviso: tema de código '{name}' desconocido; uso la paleta "
-              f"personalizada)", file=sys.stderr)
+        print(f"    (warning: unknown code theme '{name}'; using the custom "
+              f"palette)", file=sys.stderr)
         return CUSTOM_CODE_STYLE
 
 
-# Bloque con tema propio: un comentario `<!-- code-theme: X -->` en la línea
-# justo encima de la valla ```. Permite que distintos bloques del mismo
-# documento usen paletas distintas, por encima del tema general del documento.
+# Per-block theme: a `<!-- code-theme: X -->` comment on the line right above the
+# ``` fence. Lets different blocks in the same document use different palettes,
+# overriding the document-wide theme.
 _THEMED_BLOCK_RE = re.compile(
     r'<!--\s*code-theme:\s*(?P<theme>[^>]*?)\s*-->[ \t]*\r?\n'
     r'```[ \t]*(?P<lang>[\w+#.-]*)[ \t]*\r?\n'
@@ -216,10 +217,10 @@ _THEMED_BLOCK_RE = re.compile(
 
 
 def extract_themed_blocks(body_md):
-    """Extrae los bloques marcados con `<!-- code-theme: X -->` y los resalta con
-    ese tema concreto (en lugar del tema general del documento). Los reemplaza
-    por un marcador de texto plano y devuelve (markdown_modificado, {marca: html})
-    para reinyectar el HTML ya resaltado tras la conversión de Markdown."""
+    """Extract blocks marked with `<!-- code-theme: X -->` and highlight them
+    with that specific theme (instead of the document-wide theme). Replace them
+    with a plain-text marker and return (modified_markdown, {marker: html}) so
+    the already-highlighted HTML can be re-injected after Markdown conversion."""
     blocks = {}
 
     def repl(m):
@@ -239,8 +240,8 @@ def extract_themed_blocks(body_md):
 
 
 # ─────────────────────────── CSS ───────────────────────────
-# Tamaños subidos +1 pt respecto a la versión anterior (TODO #5), salvo la
-# cabecera/pie, que se mantienen a 9.5 pt.
+# Sizes bumped +1 pt over the previous version, except the header/footer, which
+# stay at 9.5 pt.
 
 BASE_CSS = """
 html, body {
@@ -252,7 +253,7 @@ html, body {
     color: #1a1a1a;
 }
 
-/* ── Portada ── */
+/* ── Cover ── */
 .cover {
     height: 100vh;
     box-sizing: border-box;
@@ -283,11 +284,11 @@ html, body {
 .cover .logo      { max-width: 180px; max-height: 180px; object-fit: contain; margin: 40px 0; }
 .cover .author    { font-size: 14pt; font-style: italic; color: #333; padding-bottom: 1cm; }
 
-/* ── Índice de contenidos ── */
+/* ── Table of contents ── */
 .toc-page { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
 .toc-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18.5pt; margin-bottom: 20px; }
-/* La fuente del índice (TODO #1): forzar la serif del documento en todos los
-   elementos del árbol del TOC, evitando que herede una fuente del sistema. */
+/* TOC font: force the document serif on every element of the TOC tree, so it
+   doesn't inherit a system font. */
 .toc-page .toc, .toc-page .toc * { font-family: 'Source Serif 4', Georgia, serif; }
 .toc-page .toc { margin: 0; padding: 0; }
 .toc-page .toc ul { list-style: none; margin: 0; padding: 0; }
@@ -296,7 +297,7 @@ html, body {
 .toc-page .toc > ul > li { font-size: 14.5pt; font-weight: bold; }
 .toc-page .toc a { text-decoration: none; color: #1a1a1a; }
 
-/* ── Índices de figuras/tablas/código ── */
+/* ── Lists of figures/tables/code ── */
 .indices-section { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
 .idx-block { margin-bottom: 32px; }
 .idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18.5pt; margin-bottom: 16px; }
@@ -305,12 +306,12 @@ html, body {
 .doc-index a { text-decoration: none; color: #1a1a1a; }
 .idx-label { font-weight: bold; }
 
-/* ── Contenido ── */
+/* ── Content ── */
 a { color: #5a8fc4; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', Arial, sans-serif; }
 h1 { font-size: 24.5pt; margin-bottom: 16px; }
-/* Cada sección de nivel ## empieza en página nueva. El salto forzado tras el
-   índice y este se fusionan, así que no aparece una página en blanco. */
+/* Each ## section starts on a new page. The forced break after the TOC and this
+   one merge, so no blank page appears. */
 .body h2 { break-before: page; }
 h2 { font-size: 18.5pt; margin-top: 28px; }
 h3 { font-size: 15pt; margin-top: 20px; color: #222; }
@@ -335,10 +336,10 @@ pre {
     word-wrap: break-word;
 }
 pre code { background: none; padding: 0; }
-/* Bloques resaltados (codehilite con noclasses): el <div> lleva el color de
-   fondo del tema en línea; hacemos que el <pre> interior sea transparente y
-   pasamos el relleno/redondeo al <div>, para que también funcionen los temas
-   oscuros (monokai, dracula…) sin que el fondo gris de `pre` los tape. */
+/* Highlighted blocks (codehilite with noclasses): the <div> carries the theme's
+   background color inline; we make the inner <pre> transparent and move the
+   padding/radius to the <div>, so dark themes (monokai, dracula…) also work
+   without the grey `pre` background covering them. */
 .codehilite { background: #f4f4f4; border-radius: 4px; padding: 12px; break-inside: avoid; }
 .codehilite pre { background: transparent; padding: 0; margin: 0; border-radius: 0; }
 table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13pt; break-inside: avoid; }
@@ -363,62 +364,108 @@ caption { caption-side: bottom; font-size: 12pt; color: #555; padding-top: 6px; 
 .code-block > pre, .code-block > .codehilite { margin: 0; }
 .code-label { font-size: 12pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
 
-/* ── Citas y bibliografía ── */
+/* ── Citations and bibliography ── */
 a.cite { text-decoration: none; }
 .ref-entry {
     display: block;
     margin: 6px 0;
     padding-left: 1.6em;
-    text-indent: -1.6em;   /* sangría francesa: la 1ª línea sobresale */
+    text-indent: -1.6em;   /* hanging indent: the first line sticks out */
 }
 
-/* ── Mantener junto al elemento anterior (TODO #6) ──
-   Evita el salto de página *antes* del elemento y permite que el propio
-   elemento se parta si no cabe, de modo que quede pegado al texto previo.
-   El `break-inside: auto` debe alcanzar también al `.codehilite`/`pre`
-   interior: si no, un bloque más alto que una página deja la marca de "no
-   romper dentro" intacta, vuelve irresoluble el "pegar al anterior" y
-   WeasyPrint empuja el bloque hacia abajo dejando un hueco enorme. */
+/* ── Keep with the previous element ──
+   Prevents a page break *before* the element and lets the element itself split
+   if it doesn't fit, so it stays attached to the preceding text. The
+   `break-inside: auto` must also reach the inner `.codehilite`/`pre`: otherwise
+   a block taller than a page keeps its "don't break inside" mark, makes "keep
+   with previous" unsolvable, and WeasyPrint pushes the block down leaving a
+   huge gap. */
 .keep-with-prev { break-before: avoid; }
 .keep-with-prev,
 .keep-with-prev .codehilite,
 .keep-with-prev pre { break-inside: auto; }
 
-/* Outline del PDF: solo las secciones del cuerpo, no la portada ni los índices.
-   Qué niveles concretos entran (y las marcas individuales) lo añade outline_css()
-   según la profundidad del índice, para que coincidan con el índice de contenidos. */
+/* PDF outline: only the body sections, not the cover or the indexes. Which
+   levels are included (and the individual marks) is added by outline_css()
+   based on the TOC depth, so they match the table of contents. */
 h1, h2, h3, h4, h5, h6 { bookmark-level: none; }
 """
 
 
 def _css_str(s):
-    """Escapa una cadena para incrustarla en un valor `content:` de CSS."""
+    """Escape a string for embedding in a CSS `content:` value."""
     return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
+# ─────────────────────── Per-section font sizes ───────────────────────
+# Each front-matter (or `.theme`) key adjusts the font size of one section of the
+# document. They are emitted as CSS rules *after* BASE_CSS, so they win by
+# cascade order (same or higher specificity). The header/footer keys are applied
+# separately, inside the @page margin boxes.
+FONT_SIZE_SELECTORS = {
+    "text_size":  "html, body",                # the body text
+    "title_size": ".cover h1",                 # the cover title
+    "h1_size":    ".body h1",                   # body headings, per level
+    "h2_size":    ".body h2",
+    "h3_size":    ".body h3",
+    "h4_size":    ".body h4",
+    "h5_size":    ".body h5",
+    "h6_size":    ".body h6",
+    "code_size":  "pre, code, .codehilite pre",  # code blocks and inline code
+    "table_size": "table",                     # tables
+}
+
+# Default size of the page header and footer (the @page margin boxes).
+DEFAULT_HEADER_FOOTER_SIZE = "9.5pt"
+
+
+def _font_size(val):
+    """Normalize a font-size value: a bare number is read as points
+    (`14` -> `14pt`); any other valid CSS unit (`1.2em`, `12px`…) is kept as-is.
+    Empty string if nothing was given."""
+    v = (val or "").strip()
+    if not v:
+        return ""
+    if re.fullmatch(r"\d+(\.\d+)?", v):
+        return f"{v}pt"
+    return v
+
+
+def font_size_css(meta):
+    """CSS font-size rules for the sections the front matter (or the `.theme`)
+    customizes. Embedded after BASE_CSS to override the default sizes. The header
+    and footer are adjusted in page_css."""
+    rules = []
+    for key, selector in FONT_SIZE_SELECTORS.items():
+        size = _font_size(meta.get(key))
+        if size:
+            rules.append(f"{selector} {{ font-size: {size}; }}")
+    return "\n".join(rules)
+
+
 def resolve_page_size(meta):
-    """Resuelve `page_size` + `orientation` a un valor CSS para `@page { size }`
-    (p. ej. 'A4' o 'letter landscape'). Avisa y cae en el valor por defecto si el
-    tamaño o la orientación son desconocidos (igual que con `code_theme`)."""
+    """Resolve `page_size` + `orientation` to a CSS value for `@page { size }`
+    (e.g. 'A4' or 'letter landscape'). Warn and fall back to the default if the
+    size or orientation are unknown (same as with `code_theme`)."""
     name = (meta.get("page_size") or "").strip().lower()
     size = PAGE_SIZES.get(name, "A4") if name else "A4"
     if name and name not in PAGE_SIZES:
-        print(f"    (aviso: tamaño de página '{name}' desconocido; uso A4)",
+        print(f"    (warning: unknown page size '{name}'; using A4)",
               file=sys.stderr)
     orient = (meta.get("orientation") or "").strip().lower()
     if orient in ("landscape", "apaisado", "horizontal"):
         return f"{size} landscape"
     if orient and orient not in ("portrait", "vertical", "retrato"):
-        print(f"    (aviso: orientación '{orient}' desconocida; uso vertical)",
+        print(f"    (warning: unknown orientation '{orient}'; using portrait)",
               file=sys.stderr)
     return size
 
 
 def resolve_margins(meta):
-    """Resuelve los márgenes del cuerpo a un valor CSS `top right bottom left`.
-    Prioriza `margins` (CSS literal, p. ej. '1.15in 0.85in'); si no, compone con
-    las claves por lado (`margin_top`…), usando el valor por defecto en las que
-    falten."""
+    """Resolve the body margins to a CSS value `top right bottom left`. Prefers
+    `margins` (literal CSS, e.g. '1.15in 0.85in'); otherwise composes them from
+    the per-side keys (`margin_top`…), using the default for any that are
+    missing."""
     whole = (meta.get("margins") or "").strip()
     if whole:
         return whole
@@ -427,17 +474,17 @@ def resolve_margins(meta):
                     for k, d in zip(sides, DEFAULT_MARGINS))
 
 
-# Profundidad por defecto del índice de contenidos: hasta los `####` (nivel 4).
-# El `#####` (nivel 5) no aparece salvo que se suba esta profundidad con
-# `toc_depth` o se marque el encabezado concreto con `<!-- toc -->`.
+# Default depth of the table of contents: down to `####` (level 4). `#####`
+# (level 5) doesn't appear unless this depth is raised with `toc_depth` or the
+# specific heading is marked with `<!-- toc -->`.
 DEFAULT_TOC_DEPTH = 4
 
 
 def resolve_toc_depth(meta):
-    """Resuelve `toc_depth`: nivel máximo de encabezado que entra en el índice de
-    contenidos (3 = hasta `###`, 4 = hasta `####`, 5 = hasta `#####`). Por defecto
-    4. Acepta '3'/'4'/'5', 'h4', '####'… Avisa y cae en el valor por defecto si el
-    valor es desconocido (igual que con `code_theme`)."""
+    """Resolve `toc_depth`: the deepest heading level that enters the table of
+    contents (3 = down to `###`, 4 = down to `####`, 5 = down to `#####`).
+    Default 4. Accepts '3'/'4'/'5', 'h4', '####'… Warn and fall back to the
+    default if the value is unknown (same as with `code_theme`)."""
     raw = (meta.get("toc_depth") or "").strip().lower()
     if not raw:
         return DEFAULT_TOC_DEPTH
@@ -448,19 +495,21 @@ def resolve_toc_depth(meta):
         depth = int(m.group(0)) if m else 0
     if 2 <= depth <= 6:
         return depth
-    print(f"    (aviso: profundidad de índice '{raw}' no válida; uso "
+    print(f"    (warning: invalid TOC depth '{raw}'; using "
           f"{DEFAULT_TOC_DEPTH})", file=sys.stderr)
     return DEFAULT_TOC_DEPTH
 
 
 def page_css(meta, strings, page_size):
-    """@page del cuerpo: tamaño + márgenes + cabecera (título · subtítulo) y pie
-    (autor centrado, 'n / total' a la derecha). El texto se incrusta como
-    cadenas CSS; los recuadros de margen recortan lo que sobre."""
+    """Body @page: size + margins + header (title · subtitle) and footer (author
+    centered, 'n / total' on the right). The text is embedded as CSS strings;
+    the margin boxes clip whatever overflows."""
     header = " · ".join(filter(None, [meta.get("title", ""), meta.get("subtitle", "")]))
     author = meta.get("author", "")
     top = (f'content: "{_css_str(header)}";' if header else "content: none;")
     bottom = (f'content: "{_css_str(author)}";' if author else "content: none;")
+    header_size = _font_size(meta.get("header_size")) or DEFAULT_HEADER_FOOTER_SIZE
+    footer_size = _font_size(meta.get("footer_size")) or DEFAULT_HEADER_FOOTER_SIZE
     return f"""
 @page {{
     size: {page_size};
@@ -468,25 +517,27 @@ def page_css(meta, strings, page_size):
     @top-center {{
         {top}
         font-family: 'Space Grotesk', Arial, sans-serif;
-        font-size: 9.5pt; color: #666;
+        font-size: {header_size}; color: #666;
         white-space: nowrap; overflow: hidden;
     }}
     @bottom-center {{
         {bottom}
         font-family: 'Space Grotesk', Arial, sans-serif;
-        font-size: 9.5pt; color: #666;
+        font-size: {footer_size}; color: #666;
         white-space: nowrap; overflow: hidden;
     }}
     @bottom-right {{
         content: counter(page) " / " counter(pages);
         font-family: 'Space Grotesk', Arial, sans-serif;
-        font-size: 9.5pt; color: #666;
+        font-size: {footer_size}; color: #666;
     }}
 }}
 """
 
 
-# ─────────────────────── Front matter / metadatos ───────────────────────
+# ─────────────────────── Front matter / metadata ───────────────────────
+# Keys accept English names and Spanish aliases (titulo, autor, imagen…) so
+# either language works in the front matter and in `.theme` files.
 
 _META_ALIASES = {
     "title": "title", "titulo": "title", "título": "title",
@@ -523,40 +574,93 @@ _META_ALIASES = {
     "citation_style": "citation_style", "citationstyle": "citation_style",
     "cite_style": "citation_style", "estilo_cita": "citation_style",
     "estilo_citas": "citation_style", "estilo_de_cita": "citation_style",
+    # .theme file (path relative to the .md, like `logo` or `bibliography`).
+    "theme": "theme", "tema": "theme", "estilo": "theme", "style": "theme",
+    "theme_file": "theme", "fichero_tema": "theme", "archivo_tema": "theme",
+    # Per-section font sizes.
+    "text_size": "text_size", "font_size": "text_size", "body_size": "text_size",
+    "tamano_texto": "text_size", "tamaño_texto": "text_size",
+    "tamano_letra": "text_size", "tamaño_letra": "text_size",
+    "title_size": "title_size", "tamano_titulo": "title_size",
+    "tamaño_titulo": "title_size", "tamaño_título": "title_size",
+    "tamano_portada": "title_size", "tamaño_portada": "title_size",
+    "h1_size": "h1_size", "tamano_h1": "h1_size", "tamaño_h1": "h1_size",
+    "h2_size": "h2_size", "tamano_h2": "h2_size", "tamaño_h2": "h2_size",
+    "h3_size": "h3_size", "tamano_h3": "h3_size", "tamaño_h3": "h3_size",
+    "h4_size": "h4_size", "tamano_h4": "h4_size", "tamaño_h4": "h4_size",
+    "h5_size": "h5_size", "tamano_h5": "h5_size", "tamaño_h5": "h5_size",
+    "h6_size": "h6_size", "tamano_h6": "h6_size", "tamaño_h6": "h6_size",
+    "code_size": "code_size", "tamano_codigo": "code_size",
+    "tamaño_codigo": "code_size", "tamaño_código": "code_size",
+    "table_size": "table_size", "tamano_tabla": "table_size",
+    "tamaño_tabla": "table_size", "tamano_tablas": "table_size",
+    "tamaño_tablas": "table_size",
+    "header_size": "header_size", "tamano_cabecera": "header_size",
+    "tamaño_cabecera": "header_size",
+    "footer_size": "footer_size", "tamano_pie": "footer_size",
+    "tamaño_pie": "footer_size", "tamano_footer": "footer_size",
+    "tamaño_footer": "footer_size",
 }
 
 
-def parse_front_matter(text):
-    """Lee un bloque de front matter YAML simple (`clave: valor`) delimitado por
-    líneas `---` al principio del fichero (TODO #4). Devuelve (meta, body).
+# Defaults for every metadata field. The `.theme` keys are layered on top of this
+# base first, and the .md's own front matter on top of that (it wins). The size
+# keys stay empty: an empty string means "use the BASE_CSS default size".
+DEFAULT_META = {
+    "title": "", "subtitle": "", "comment": "", "author": "",
+    "logo": "", "lang": "es", "code_theme": "", "numbering": "true",
+    "toc_depth": "",
+    "page_size": "", "orientation": "", "margins": "",
+    "margin_top": "", "margin_right": "", "margin_bottom": "",
+    "margin_left": "", "bibliography": "", "citation_style": "",
+    "theme": "",
+    "text_size": "", "title_size": "",
+    "h1_size": "", "h2_size": "", "h3_size": "", "h4_size": "",
+    "h5_size": "", "h6_size": "",
+    "code_size": "", "table_size": "",
+    "header_size": "", "footer_size": "",
+}
 
-    Si no hay front matter, el cuerpo es el texto entero y el título se toma del
-    primer encabezado `# ` (que se elimina del cuerpo para no duplicarlo)."""
-    meta = {"title": "", "subtitle": "", "comment": "", "author": "",
-            "logo": "", "lang": "es", "code_theme": "", "numbering": "true",
-            "toc_depth": "",
-            "page_size": "", "orientation": "", "margins": "",
-            "margin_top": "", "margin_right": "", "margin_bottom": "",
-            "margin_left": "", "bibliography": "", "citation_style": ""}
+
+def parse_kv_lines(lines):
+    """Read `key: value` lines (front matter or `.theme`) into a dict holding
+    only the keys that are *present* (canonicalized via _META_ALIASES). It does
+    not apply defaults: this way the caller knows which keys were actually set
+    and can give some sources precedence over others."""
+    meta = {}
+    for raw in lines:
+        if ":" not in raw:
+            continue
+        key, val = raw.split(":", 1)
+        canon = _META_ALIASES.get(key.strip().lower())
+        if canon:
+            meta[canon] = val.strip().strip('"').strip("'").strip()
+    return meta
+
+
+def parse_front_matter(text):
+    """Read a simple YAML front-matter block (`key: value`) delimited by `---`
+    lines at the start of the file. Returns (meta, body), where `meta` holds only
+    the keys *present* in the front matter (no defaults); the caller merges them
+    with the `.theme` and DEFAULT_META.
+
+    If there is no title in the front matter, it is taken from the first `# `
+    heading (which is removed from the body so it isn't duplicated). That heading
+    title takes precedence over any the `.theme` might carry."""
     lines = text.splitlines()
     body_start = 0
+    meta = {}
 
     if lines and lines[0].strip() == "---":
         for i in range(1, len(lines)):
             if lines[i].strip() == "---":
-                for raw in lines[1:i]:
-                    if ":" not in raw:
-                        continue
-                    key, val = raw.split(":", 1)
-                    canon = _META_ALIASES.get(key.strip().lower())
-                    if canon:
-                        meta[canon] = val.strip().strip('"').strip("'").strip()
+                meta = parse_kv_lines(lines[1:i])
                 body_start = i + 1
                 break
 
     body_lines = lines[body_start:]
 
-    if not meta["title"]:
+    if not meta.get("title"):
         for idx, line in enumerate(body_lines):
             if line.startswith("# "):
                 meta["title"] = line[2:].strip()
@@ -566,11 +670,37 @@ def parse_front_matter(text):
     return meta, "\n".join(body_lines)
 
 
+def load_theme(md_path, md_meta):
+    """Load the `.theme` named in `theme:` (path relative to the .md, like the
+    logo or the bibliography) and return its explicit keys. The `.theme` has the
+    same `key: value` format as the front matter; it may (optionally) be
+    delimited by `---` lines, so a front matter can be reused as a theme. With no
+    `theme` field, returns {}. Raises ValueError if the file does not exist."""
+    field = (md_meta.get("theme") or "").strip()
+    if not field or field.lower() in ("none", "no", "false"):
+        return {}
+    p = Path(field)
+    theme_path = p if p.is_absolute() else md_path.parent / p
+    if not theme_path.exists():
+        raise ValueError(f"theme '{field}' not found")
+    lines = theme_path.read_text(encoding="utf-8").splitlines()
+    if lines and lines[0].strip() == "---":
+        inner = []
+        for ln in lines[1:]:
+            if ln.strip() == "---":
+                break
+            inner.append(ln)
+        lines = inner
+    theme_meta = parse_kv_lines(lines)
+    theme_meta.pop("theme", None)   # a .theme does not chain to another .theme
+    return theme_meta
+
+
 def find_logo(md_path, meta):
-    """Resuelve el logo/imagen de portada a un data URI a partir del campo
-    `logo:` del front matter (ruta arbitraria relativa al .md o absoluta).
-    Si no se indica `logo:`, la portada no lleva imagen. `logo: none` también
-    lo desactiva explícitamente."""
+    """Resolve the cover logo/image to a data URI from the `logo:` field of the
+    front matter (arbitrary path relative to the .md, or absolute). If `logo:` is
+    not given, the cover has no image. `logo: none` also disables it
+    explicitly."""
     logo_field = (meta.get("logo") or "").strip()
     if not logo_field or logo_field.lower() in ("none", "no", "false"):
         return None
@@ -584,23 +714,23 @@ def find_logo(md_path, meta):
     return None
 
 
-# ─────────────────────── Numeración de secciones y referencias cruzadas ───────────────────────
+# ─────────────────────── Section numbering and cross-references ───────────────────────
 
 _HEADING_RE = re.compile(r'^(#{2,6})\s+(.*)$')
 _FENCE_RE = re.compile(r'^\s*(```|~~~)')
 
 
 def apply_section_numbering(body_md):
-    """Numera automáticamente los encabezados de sección (`##` → 1, 2, 3…) y
-    subsección (`###` → 1.1, 1.2…) en el Markdown antes de convertirlo, de modo
-    que el número aparezca igual en el cuerpo, en el índice de contenidos y en los
-    marcadores (outline) del PDF, sin que el autor lo escriba a mano.
+    """Auto-number section headings (`##` -> 1, 2, 3…) and subsection headings
+    (`###` -> 1.1, 1.2…) in the Markdown before converting it, so the number
+    appears the same in the body, the table of contents, and the PDF bookmarks
+    (outline), without the author writing it by hand.
 
-    Numera `##` (1.), `###` (1.1), `####` (1.1.1) y `#####` (1.1.1.1), reiniciando
-    los contadores de nivel inferior al subir de sección. Ignora los encabezados
-    dentro de vallas de código. Activada por defecto; desactívala con
-    `numbering: false` en el front matter si el documento ya trae la numeración
-    escrita a mano (para no duplicarla)."""
+    Numbers `##` (1.), `###` (1.1), `####` (1.1.1) and `#####` (1.1.1.1),
+    resetting the lower-level counters when moving up a section. Ignores headings
+    inside code fences. Enabled by default; disable it with `numbering: false` in
+    the front matter if the document already carries hand-written numbering (to
+    avoid duplicating it)."""
     h2 = h3 = h4 = h5 = 0
     in_fence = False
     out = []
@@ -631,17 +761,17 @@ def apply_section_numbering(body_md):
     return "\n".join(out)
 
 
-# Marcas individuales para el índice de contenidos: un comentario `<!-- toc -->`
-# (forzar la inclusión de un encabezado que excede la profundidad por defecto, p.
-# ej. un `#####`) o `<!-- no-toc -->` (excluir uno que sí entraría) en la línea
-# justo encima del encabezado. Se traducen a una clase `attr_list` en el propio
-# encabezado, que luego collect_toc_overrides localiza por su id.
+# Per-heading TOC marks: a `<!-- toc -->` comment (force the inclusion of a
+# heading that exceeds the default depth, e.g. a `#####`) or `<!-- no-toc -->`
+# (exclude one that would otherwise enter) on the line right above the heading.
+# They are translated into an `attr_list` class on the heading itself, which
+# collect_toc_overrides then locates by its id.
 _TOC_MARK_RE = re.compile(r'^\s*<!--\s*(no-?toc|toc)\s*-->\s*$', re.IGNORECASE)
 
 
 def _add_heading_class(line, cls):
-    """Añade una clase `attr_list` a una línea de encabezado, fusionándola con un
-    bloque `{: ... }` ya existente si lo hubiera."""
+    """Add an `attr_list` class to a heading line, merging it with an existing
+    `{: ... }` block if there is one."""
     m = re.search(r'\{:?\s*([^}]*)\}\s*$', line)
     if m:
         inner = m.group(1).strip()
@@ -650,10 +780,10 @@ def _add_heading_class(line, cls):
 
 
 def apply_toc_markers(body_md):
-    """Traduce los comentarios `<!-- toc -->` / `<!-- no-toc -->` situados sobre un
-    encabezado en una clase (`toc-force` / `toc-skip`) sobre ese encabezado, y
-    elimina el comentario. Permite líneas en blanco entre la marca y el encabezado.
-    Ignora las marcas dentro de vallas de código."""
+    """Translate the `<!-- toc -->` / `<!-- no-toc -->` comments placed above a
+    heading into a class (`toc-force` / `toc-skip`) on that heading, and remove
+    the comment. Allows blank lines between the mark and the heading. Ignores
+    marks inside code fences."""
     out = []
     pending = None        # 'toc-force' | 'toc-skip' | None
     in_fence = False
@@ -668,35 +798,35 @@ def apply_toc_markers(body_md):
             if mark:
                 pending = "toc-skip" if mark.group(1).lower().startswith("no") \
                     else "toc-force"
-                continue                      # descarta el comentario
+                continue                      # drop the comment
             if _HEADING_RE.match(line):
                 if pending:
                     line = _add_heading_class(line, pending)
                 pending = None
             elif line.strip():
-                pending = None                # solo se permiten líneas en blanco
+                pending = None                # only blank lines are allowed
         out.append(line)
     return "\n".join(out)
 
 
-# Referencia cruzada `[[fig-2-1]]` / `[[tab-1-1]]` / `[[code-3-2]]`: apunta a las
-# anclas que genera add_asset_numbers. El patrón es estricto (tipo-x-y) para no
-# capturar dobles corchetes que aparezcan por casualidad en el texto o el código.
+# Cross-reference `[[fig-2-1]]` / `[[tab-1-1]]` / `[[code-3-2]]`: points at the
+# anchors add_asset_numbers generates. The pattern is strict (type-x-y) so it
+# doesn't capture double brackets that appear by chance in the text or code.
 _XREF_RE = re.compile(r'\[\[\s*((?:fig|tab|code)-\d+-\d+)\s*\]\]')
 
 
 def resolve_cross_refs(html, figures, tables, code_blocks):
-    """Resuelve las referencias cruzadas `[[fig-2-1]]` a un enlace al ancla del
-    elemento, mostrando su número como texto visible (p. ej. «Figura 2.1»). Avisa
-    de las referencias a anclas inexistentes y las deja sin tocar para que el
-    autor las localice (igual que con un `code_theme` desconocido)."""
+    """Resolve cross-references `[[fig-2-1]]` into a link to the element's anchor,
+    showing its number as the visible text (e.g. "Figure 2.1"). Warns about
+    references to non-existent anchors and leaves them untouched so the author can
+    find them (same as with an unknown `code_theme`)."""
     labels = {aid: nl for nl, cap, aid in (*figures, *tables, *code_blocks)}
 
     def repl(m):
         aid = m.group(1)
         label = labels.get(aid)
         if not label:
-            print(f"    (aviso: referencia cruzada a '{aid}' inexistente)",
+            print(f"    (warning: cross-reference to non-existent '{aid}')",
                   file=sys.stderr)
             return m.group(0)
         return f'<a href="#{aid}" class="xref">{escape(label)}</a>'
@@ -704,17 +834,17 @@ def resolve_cross_refs(html, figures, tables, code_blocks):
     return _XREF_RE.sub(repl, html)
 
 
-# ─────────────────────── Bibliografía y citas ───────────────────────
-# Cita en el cuerpo: `[@clave]` o varias juntas `[@clave1; @clave2]`. Cada clave
-# se sustituye por una marca enlazada (numérica `[1]` o autor-año `(Pérez, 2020)`)
-# que salta a su entrada en la sección de referencias, generada con las entradas
-# realmente citadas. La bibliografía se lee de un `.bib` (BibTeX) indicado en el
-# front matter con `bibliography:` (ruta relativa al .md, como `logo`).
+# ─────────────────────── Bibliography and citations ───────────────────────
+# In-body citation: `[@key]` or several together `[@key1; @key2]`. Each key is
+# replaced by a linked marker (numeric `[1]` or author-year `(Pérez, 2020)`) that
+# jumps to its entry in the references section, generated from the entries
+# actually cited. The bibliography is read from a `.bib` (BibTeX) named in the
+# front matter with `bibliography:` (path relative to the .md, like `logo`).
 _CITE_GROUP_RE = re.compile(r'\[@[^\]]+\]')
 _CITE_KEY_RE = re.compile(r'@([\w:.\-]+)')
 _INLINE_CODE_RE = re.compile(r'`+[^`]*`+')
 
-# Estilos de cita admitidos (clave normalizada → estilo canónico).
+# Supported citation styles (normalized key -> canonical style).
 _CITE_STYLES = {
     "": "numeric", "numeric": "numeric", "numerico": "numeric",
     "numérico": "numeric", "numerica": "numeric", "numérica": "numeric",
@@ -727,42 +857,42 @@ _CITE_STYLES = {
 
 
 def resolve_citation_style(meta):
-    """Resuelve `citation_style`: 'numeric' (def.) o 'author-year'. Avisa y cae en
-    'numeric' si el valor es desconocido (igual que con `code_theme`)."""
+    """Resolve `citation_style`: 'numeric' (default) or 'author-year'. Warn and
+    fall back to 'numeric' if the value is unknown (same as with `code_theme`)."""
     name = (meta.get("citation_style") or "").strip().lower()
     if name in _CITE_STYLES:
         return _CITE_STYLES[name]
-    print(f"    (aviso: estilo de cita '{name}' desconocido; uso numeric)",
+    print(f"    (warning: unknown citation style '{name}'; using numeric)",
           file=sys.stderr)
     return "numeric"
 
 
 def load_bibliography(md_path, meta):
-    """Carga el `.bib` indicado en `bibliography:` (ruta relativa al .md, como el
-    logo) y devuelve sus entradas (dict clave→entrada de pybtex, insensible a
-    mayúsculas). Sin campo `bibliography`, devuelve {} (no hay bibliografía).
-    Lanza ValueError si el fichero no existe o falta pybtex."""
+    """Load the `.bib` named in `bibliography:` (path relative to the .md, like
+    the logo) and return its entries (dict key->pybtex entry, case-insensitive).
+    With no `bibliography` field, returns {} (no bibliography). Raises ValueError
+    if the file does not exist or pybtex is missing."""
     field = (meta.get("bibliography") or "").strip()
     if not field:
         return {}
     p = Path(field)
     bib_path = p if p.is_absolute() else md_path.parent / p
     if not bib_path.exists():
-        raise ValueError(f"no encuentro la bibliografía '{field}'")
+        raise ValueError(f"bibliography '{field}' not found")
     try:
         from pybtex.database import parse_file
     except ImportError:
-        raise ValueError("la bibliografía necesita 'pybtex' (instálalo con: uv sync)")
+        raise ValueError("the bibliography needs 'pybtex' (install it with: uv sync)")
     return parse_file(str(bib_path)).entries
 
 
 def _ref_anchor(key):
-    """Ancla estable para una entrada de la bibliografía (`ref-<clave>`)."""
+    """Stable anchor for a bibliography entry (`ref-<key>`)."""
     return "ref-" + re.sub(r'[^a-z0-9]+', '-', key.lower()).strip('-')
 
 
 def _clean(value):
-    """Texto plano de un campo BibTeX: quita llaves y espacios sobrantes."""
+    """Plain text of a BibTeX field: strip braces and stray whitespace."""
     return str(value).replace("{", "").replace("}", "").strip()
 
 
@@ -775,7 +905,7 @@ def _person_last(p):
 
 
 def _person_full(p):
-    """Apellido(s) + iniciales: «Pérez, J. M.»."""
+    """Surname(s) + initials: "Pérez, J. M."."""
     last = _person_last(p)
     initials = " ".join(f"{_clean(n)[0]}." for n in (p.first_names + p.middle_names)
                         if _clean(n))
@@ -789,7 +919,7 @@ def _entry_year(entry, strings):
 
 
 def _authors_full(entry, lang):
-    """Lista de autores para la entrada de referencias («A, B y C»)."""
+    """Author list for the references entry ("A, B and C")."""
     names = [_person_full(p) for p in _persons(entry)]
     if not names:
         return ""
@@ -800,7 +930,7 @@ def _authors_full(entry, lang):
 
 
 def _authors_short(entry, lang):
-    """Apellidos abreviados para la marca autor-año («Pérez», «Pérez et al.»)."""
+    """Abbreviated surnames for the author-year marker ("Pérez", "Pérez et al.")."""
     lasts = [_person_last(p) for p in _persons(entry)]
     if not lasts:
         return _clean(entry.fields.get("title", "")) or "?"
@@ -813,7 +943,7 @@ def _authors_short(entry, lang):
 
 
 def _format_reference(entry, lang, strings):
-    """Entrada formateada de forma consistente: «Autores (año). *Título*. Soporte.»"""
+    """Entry formatted consistently: "Authors (year). *Title*. Container."."""
     fields = entry.fields
     title = _clean(fields.get("title", ""))
     container = _clean(fields.get("journal") or fields.get("booktitle")
@@ -830,16 +960,15 @@ def _format_reference(entry, lang, strings):
 
 
 def process_citations(body_md, bib_entries, style, lang, strings):
-    """Sustituye las citas `[@clave]` del cuerpo por marcas enlazadas y construye
-    la sección de referencias con las entradas citadas. Devuelve
-    (markdown_con_marcas, markdown_referencias|None).
+    """Replace the body's `[@key]` citations with linked markers and build the
+    references section from the cited entries. Returns
+    (markdown_with_markers, references_markdown|None).
 
-    Numera las claves por orden de primera aparición. Las marcas saltan al ancla
-    `ref-<clave>` de la entrada (mecanismo de anclas del TODO #4). Avisa de las
-    claves ausentes en el `.bib` y deja `@clave` visible. Ignora las citas dentro
-    de vallas de código."""
-    cited = []            # claves citadas, en orden de primera aparición
-    number = {}           # clave (minúsculas) → número
+    Numbers the keys in order of first appearance. The markers jump to the
+    entry's `ref-<key>` anchor. Warns about keys missing from the `.bib` and
+    leaves `@key` visible. Ignores citations inside code fences."""
+    cited = []            # cited keys, in order of first appearance
+    number = {}           # key (lowercase) -> number
 
     def number_for(key):
         k = key.lower()
@@ -852,7 +981,7 @@ def process_citations(body_md, bib_entries, style, lang, strings):
         parts = []
         for key in _CITE_KEY_RE.findall(m.group(0)):
             if key not in bib_entries:
-                print(f"    (aviso: cita '@{key}' no está en la bibliografía)",
+                print(f"    (warning: citation '@{key}' is not in the bibliography)",
                       file=sys.stderr)
                 parts.append(escape(f"@{key}"))
                 continue
@@ -869,8 +998,8 @@ def process_citations(body_md, bib_entries, style, lang, strings):
         return "[" + ", ".join(parts) + "]"
 
     def sub_line(line):
-        # Sustituye fuera de los spans de código en línea (`...`), para no tocar
-        # un `[@clave]` escrito como ejemplo entre acentos graves.
+        # Substitute outside inline-code spans (`...`), so a `[@key]` written as
+        # an example between backticks is left untouched.
         parts, last = [], 0
         for m in _INLINE_CODE_RE.finditer(line):
             parts.append(_CITE_GROUP_RE.sub(render_group, line[last:m.start()]))
@@ -893,8 +1022,8 @@ def process_citations(body_md, bib_entries, style, lang, strings):
     if not cited:
         return new_body, None
 
-    # Orden de la lista: por número de cita (numeric) o alfabético por autor
-    # (author-year). Cada entrada lleva su ancla `ref-<clave>`.
+    # List order: by citation number (numeric) or alphabetical by author
+    # (author-year). Each entry carries its `ref-<key>` anchor.
     if style == "author-year":
         ordered = sorted(cited, key=lambda k: (
             _person_last(_persons(bib_entries[k])[0]).lower()
@@ -914,16 +1043,16 @@ def process_citations(body_md, bib_entries, style, lang, strings):
     return new_body, "\n".join(lines)
 
 
-# ─────────────────────── Numeración de figuras/tablas/código ───────────────────────
+# ─────────────────────── Figure/table/code numbering ───────────────────────
 
 def add_asset_numbers(html, strings):
-    """Numera figuras, tablas y bloques de código (x.y, reiniciando en cada
-    `<h2>`), añade su etiqueta y recoge los datos para los índices.
+    """Number figures, tables and code blocks (x.y, resetting on each `<h2>`),
+    add their label, and collect the data for the indexes.
 
-    Devuelve (html, figures, tables, code_blocks, missing). `missing` lista las
-    etiquetas de los elementos SIN descripción: la imagen usa su `alt`; tablas y
-    bloques de código requieren `<!-- caption: -->`. Si `missing` no está vacío,
-    el llamador rechaza generar el PDF (TODO #7)."""
+    Returns (html, figures, tables, code_blocks, missing). `missing` lists the
+    labels of the elements WITHOUT a caption: an image uses its `alt`; tables and
+    code blocks require `<!-- caption: -->`. If `missing` is not empty, the
+    caller refuses to generate the PDF."""
     section = [0]
     figs = [0]
     tabs = [0]
@@ -947,7 +1076,7 @@ def add_asset_numbers(html, strings):
         if lo.startswith('<!--'):
             cap_m = re.match(r'<!--\s*caption:\s*(.*?)\s*-->', tag, re.DOTALL)
             pending_cap[0] = cap_m.group(1).strip() if cap_m else ""
-            return ""   # quita el comentario de la salida
+            return ""   # remove the comment from the output
         if lo.startswith('<h2'):
             section[0] += 1
             figs[0] = tabs[0] = codes[0] = 0
@@ -1003,10 +1132,10 @@ def add_asset_numbers(html, strings):
 
 
 def apply_keep_with_prev(html):
-    """Aplica la marca `<!-- keep -->` (TODO #6): añade la clase keep-with-prev
-    al siguiente elemento de bloque, forzándolo a quedarse en la misma página
-    que el contenido anterior. Se ejecuta tras la numeración, para que la marca
-    afecte al envoltorio <figure>/<div class="code-block"> ya creado."""
+    """Apply the `<!-- keep -->` mark: add the keep-with-prev class to the next
+    block element, forcing it to stay on the same page as the preceding content.
+    Runs after numbering, so the mark affects the already-created
+    <figure>/<div class="code-block"> wrapper."""
     def inject(tag):
         cm = re.search(r'class="([^"]*)"', tag)
         if cm:
@@ -1020,16 +1149,16 @@ def apply_keep_with_prev(html):
     return pattern.sub(lambda m: inject(m.group(1)), html)
 
 
-# ─────────────────────── Índice de contenidos ───────────────────────
+# ─────────────────────── Table of contents ───────────────────────
 
 _TOC_HEADING_RE = re.compile(r'<h[2-6]\b([^>]*)>', re.IGNORECASE)
 
 
 def collect_toc_overrides(html):
-    """Recoge los id de los encabezados marcados individualmente para el índice:
-    `toc-force` (forzar su inclusión aunque excedan la profundidad por defecto) y
-    `toc-skip` (excluirlos aunque entren). Las clases las inyecta apply_toc_markers
-    a partir de los comentarios `<!-- toc -->` / `<!-- no-toc -->`."""
+    """Collect the ids of headings marked individually for the TOC: `toc-force`
+    (force their inclusion even if they exceed the default depth) and `toc-skip`
+    (exclude them even if they would enter). The classes are injected by
+    apply_toc_markers from the `<!-- toc -->` / `<!-- no-toc -->` comments."""
     force, skip = set(), set()
     for m in _TOC_HEADING_RE.finditer(html):
         attrs = m.group(1)
@@ -1046,10 +1175,10 @@ def collect_toc_overrides(html):
 
 
 def _toc_items(tokens, max_level, force_ids, skip_ids):
-    """Lista de `<li>` del índice a partir del árbol de encabezados. Un encabezado
-    entra si no está marcado `toc-skip` y, o bien su nivel no supera `max_level`, o
-    bien está marcado `toc-force`. Los descendientes forzados de un encabezado
-    excluido ascienden de nivel para no perderse."""
+    """List of TOC `<li>` items from the heading tree. A heading enters if it is
+    not marked `toc-skip` and either its level does not exceed `max_level` or it
+    is marked `toc-force`. Forced descendants of an excluded heading move up a
+    level so they aren't lost."""
     items = []
     for tok in tokens:
         children = _toc_items(tok.get("children", []), max_level, force_ids, skip_ids)
@@ -1065,18 +1194,18 @@ def _toc_items(tokens, max_level, force_ids, skip_ids):
 
 
 def build_toc_html(toc_tokens, max_level, force_ids, skip_ids):
-    """Construye el HTML del índice de contenidos desde `md.toc_tokens`, incluyendo
-    por defecto hasta `max_level` (`toc_depth`) y respetando las marcas
-    individuales `<!-- toc -->` / `<!-- no-toc -->`."""
+    """Build the table-of-contents HTML from `md.toc_tokens`, including by default
+    down to `max_level` (`toc_depth`) and respecting the individual
+    `<!-- toc -->` / `<!-- no-toc -->` marks."""
     items = _toc_items(toc_tokens, max_level, force_ids, skip_ids)
     return f'<div class="toc">\n<ul>\n{"".join(items)}</ul>\n</div>'
 
 
 def outline_css(depth):
-    """Reglas `bookmark-level` de los marcadores (outline) del PDF, generadas según
-    la profundidad del índice para que coincidan con él: los niveles `##`…`#depth#`
-    se marcan; los más profundos solo si se fuerzan con `<!-- toc -->`
-    (`toc-force`), y los marcados `<!-- no-toc -->` (`toc-skip`) se omiten."""
+    """`bookmark-level` rules for the PDF outline, generated from the TOC depth so
+    they match it: levels `##`…`#depth#` are marked; deeper ones only if forced
+    with `<!-- toc -->` (`toc-force`), and those marked `<!-- no-toc -->`
+    (`toc-skip`) are omitted."""
     lines = []
     for level in range(2, 7):
         bl = level - 1
@@ -1090,7 +1219,7 @@ def outline_css(depth):
 
 
 def _indices_html(figures, tables, code_blocks, strings):
-    """Construye la sección de índices (figuras/tablas/código) no vacíos."""
+    """Build the indexes section (figures/tables/code) for the non-empty ones."""
     def _block(title, rows):
         items = "\n".join(f'    <li>{r}</li>' for r in rows)
         return (
@@ -1114,7 +1243,7 @@ def _indices_html(figures, tables, code_blocks, strings):
     return f'<div class="indices-section">\n{"".join(parts)}</div>\n'
 
 
-# ─────────────────────────── HTML (portada y contenido) ───────────────────────────
+# ─────────────────────────── HTML (cover and content) ───────────────────────────
 
 def cover_html(meta, logo_uri, strings, page_size):
     title = escape(meta["title"])
@@ -1130,7 +1259,7 @@ def cover_html(meta, logo_uri, strings, page_size):
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>@page {{ size: {page_size}; margin: 0; }}{font_face_css()}{BASE_CSS}</style>
+<style>@page {{ size: {page_size}; margin: 0; }}{font_face_css()}{BASE_CSS}{font_size_css(meta)}</style>
 </head>
 <body>
 <div class="cover">
@@ -1148,12 +1277,12 @@ def cover_html(meta, logo_uri, strings, page_size):
 
 def content_html(meta, body_md, strings, code_style, page_size,
                  bib_entries=None, citation_style="numeric"):
-    """Índice + índices + cuerpo en un único HTML. Lanza ValueError si algún
-    elemento carece de descripción (TODO #7)."""
-    # El TocExtension captura todos los niveles (2-6); la profundidad real del
-    # índice (toc_depth) y las marcas individuales se aplican después al construir
-    # el índice desde `md.toc_tokens`. `attr_list` permite inyectar las clases
-    # `toc-force` / `toc-skip` desde los comentarios `<!-- toc -->`.
+    """TOC + indexes + body in a single HTML. Raises ValueError if any element
+    lacks a caption."""
+    # The TocExtension captures every level (2-6); the real TOC depth (toc_depth)
+    # and the individual marks are applied later when building the TOC from
+    # `md.toc_tokens`. `attr_list` lets us inject the `toc-force` / `toc-skip`
+    # classes from the `<!-- toc -->` comments.
     md = markdown.Markdown(
         extensions=[TocExtension(toc_depth="2-6"), "tables", "fenced_code",
                     "codehilite", "attr_list"],
@@ -1161,33 +1290,33 @@ def content_html(meta, body_md, strings, code_style, page_size,
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}"}},
     )
-    # Citas y bibliografía: se procesan antes de numerar para que la sección de
-    # «Referencias» (un `##` más) entre en la numeración, el índice y el outline.
+    # Citations and bibliography: processed before numbering so the "References"
+    # section (one more `##`) enters the numbering, the TOC, and the outline.
     if bib_entries:
         body_md, refs_md = process_citations(
             body_md, bib_entries, citation_style, meta.get("lang", "es"), strings)
         if refs_md:
             body_md = f"{body_md}\n\n{refs_md}"
-    # Marcas individuales del índice (`<!-- toc -->` / `<!-- no-toc -->`): se
-    # traducen a clases antes de numerar y convertir (funcionan con la numeración
-    # activada o no).
+    # Individual TOC marks (`<!-- toc -->` / `<!-- no-toc -->`): translated into
+    # classes before numbering and converting (they work whether numbering is on
+    # or off).
     body_md = apply_toc_markers(body_md)
-    # Numeración automática de secciones (activada por defecto): se aplica al
-    # Markdown antes de convertir, para que el número quede reflejado en cuerpo,
-    # índice y outline. Se desactiva con `numbering: false`.
+    # Automatic section numbering (on by default): applied to the Markdown before
+    # converting, so the number is reflected in the body, the TOC, and the
+    # outline. Disabled with `numbering: false`.
     if _truthy(meta.get("numbering")):
         body_md = apply_section_numbering(body_md)
-    # Los bloques con tema propio se resaltan aparte y se reinyectan tras la
-    # conversión; el resto usa el tema general (code_style) vía codehilite.
+    # Blocks with their own theme are highlighted separately and re-injected after
+    # conversion; the rest use the document-wide theme (code_style) via codehilite.
     body_md, themed_blocks = extract_themed_blocks(body_md)
     body = md.convert(body_md)
     toc_tokens = md.toc_tokens
     for token, snippet in themed_blocks.items():
         body = body.replace(f"<p>{token}</p>", snippet).replace(token, snippet)
 
-    # Índice de contenidos: profundidad por defecto (toc_depth) + marcas
-    # individuales recogidas de las clases que apply_toc_markers dejó en los
-    # encabezados del cuerpo ya convertido.
+    # Table of contents: default depth (toc_depth) + individual marks collected
+    # from the classes apply_toc_markers left on the headings of the converted
+    # body.
     toc_depth = resolve_toc_depth(meta)
     force_ids, skip_ids = collect_toc_overrides(body)
     toc_tree = build_toc_html(toc_tokens, toc_depth, force_ids, skip_ids)
@@ -1195,7 +1324,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
     body, figures, tables, code_blocks, missing = add_asset_numbers(body, strings)
     if missing:
         raise ValueError(
-            "elementos sin descripción (añade <!-- caption: ... --> o un alt): "
+            "elements without a caption (add <!-- caption: ... --> or an alt): "
             + ", ".join(missing)
         )
     body = resolve_cross_refs(body, figures, tables, code_blocks)
@@ -1206,7 +1335,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{outline_css(toc_depth)}</style>
+<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{outline_css(toc_depth)}</style>
 </head>
 <body>
 <div class="toc-page">
@@ -1218,11 +1347,11 @@ def content_html(meta, body_md, strings, code_style, page_size,
 </html>"""
 
 
-# ─────────────────────────── Ensamblado ───────────────────────────
+# ─────────────────────────── Assembly ───────────────────────────
 
 def merge_pdfs(cover_bytes, content_bytes, meta):
-    """Antepone la portada al contenido conservando outline y enlaces internos
-    (pypdf reajusta las páginas), y escribe los metadatos del documento."""
+    """Prepend the cover to the content, preserving the outline and internal links
+    (pypdf re-adjusts the pages), and write the document metadata."""
     writer = pypdf.PdfWriter()
     writer.append(io.BytesIO(cover_bytes))
     writer.append(io.BytesIO(content_bytes))
@@ -1244,12 +1373,16 @@ def merge_pdfs(cover_bytes, content_bytes, meta):
 
 
 def convert_one(md_path, out_path=None):
-    """Convierte un único .md a .pdf. Por defecto el PDF se escribe junto al .md
-    con el mismo nombre; con `out_path` se escribe en la ruta indicada (opción
-    `-o`). Lanza excepción si algo falla."""
+    """Convert a single .md to .pdf. By default the PDF is written next to the .md
+    with the same name; with `out_path` it is written to the given path (the `-o`
+    option). Raises an exception if anything fails."""
     pdf_path = out_path or md_path.with_suffix(".pdf")
     md_text = md_path.read_text(encoding="utf-8")
-    meta, body_md = parse_front_matter(md_text)
+    md_meta, body_md = parse_front_matter(md_text)
+    # Precedence: DEFAULT_META < .theme < the .md's front matter. So an option
+    # repeated in the .md wins over the one in the .theme.
+    theme_meta = load_theme(md_path, md_meta)
+    meta = {**DEFAULT_META, **theme_meta, **md_meta}
     strings = get_strings(meta["lang"])
     logo_uri = find_logo(md_path, meta)
     base_url = md_path.resolve().parent.as_uri() + "/"
@@ -1271,10 +1404,10 @@ def convert_one(md_path, out_path=None):
 
 
 def convert_and_report(md_path, out_path=None):
-    """Convierte un .md informando con el formato estándar
-    (`nombre.md → nombre.pdf [OK, NN KB]` / `[ERROR: …]`). Con `out_path` el PDF
-    se escribe en la ruta indicada (opción `-o`). Devuelve True si fue bien. Lo
-    usan tanto la conversión única como el modo --watch."""
+    """Convert a .md, reporting in the standard format
+    (`name.md → name.pdf [OK, NN KB]` / `[ERROR: …]`). With `out_path` the PDF is
+    written to the given path (the `-o` option). Returns True on success. Used by
+    both single conversion and --watch mode."""
     pdf_path = out_path or md_path.with_suffix(".pdf")
     print(f"  {md_path.name} → {pdf_path.name}", end=" ", flush=True)
     try:
@@ -1287,22 +1420,21 @@ def convert_and_report(md_path, out_path=None):
 
 
 def watch_files(md_files, watch_dirs):
-    """Vigila los .md y regenera su PDF cada vez que se guardan (TODO #10). Los
-    directorios indicados en la línea de órdenes se vigilan enteros, incluidos los
-    .md que se creen después. Aplica un pequeño debounce para no regenerar dos
-    veces ante varios eventos de guardado seguidos, y sale limpiamente con
-    Ctrl-C."""
+    """Watch the .md files and rebuild their PDF every time they are saved. The
+    directories given on the command line are watched whole, including .md files
+    created later. Applies a small debounce so it doesn't rebuild twice on several
+    consecutive save events, and exits cleanly on Ctrl-C."""
     try:
         from watchdog.events import FileSystemEventHandler
         from watchdog.observers import Observer
     except ImportError:
-        print("El modo --watch necesita 'watchdog' (instálalo con: uv sync)")
+        print("--watch mode needs 'watchdog' (install it with: uv sync)")
         sys.exit(1)
 
     import threading
 
-    # Rutas absolutas vigiladas → Path a convertir. El conjunto crece con los .md
-    # nuevos que aparezcan en alguno de los directorios indicados.
+    # Watched absolute paths -> Path to convert. The set grows with the new .md
+    # files that appear in any of the given directories.
     targets = {p.resolve(): p for p in md_files}
     watched_dirs = {d.resolve() for d in watch_dirs}
     dirs = sorted(watched_dirs | {p.resolve().parent for p in md_files})
@@ -1330,7 +1462,7 @@ def watch_files(md_files, watch_dirs):
         if p in targets:
             return p
         if p.parent in watched_dirs:
-            targets[p] = p   # .md nuevo dentro de un directorio vigilado
+            targets[p] = p   # new .md inside a watched directory
             return p
         return None
 
@@ -1342,7 +1474,7 @@ def watch_files(md_files, watch_dirs):
         on_created = on_modified
 
         def on_moved(self, event):
-            # Algunos editores guardan moviendo un temporal sobre el fichero.
+            # Some editors save by moving a temp file over the original.
             dest = getattr(event, "dest_path", "")
             if dest and target_for(dest):
                 schedule(Path(dest).resolve())
@@ -1352,19 +1484,19 @@ def watch_files(md_files, watch_dirs):
         observer.schedule(Handler(), str(d), recursive=False)
     observer.start()
 
-    # Conversión inicial para dejar los PDF al día al arrancar.
+    # Initial conversion to bring the PDFs up to date on startup.
     for md_path in md_files:
         convert_and_report(md_path)
-    resumen = f"{len(targets)} archivo(s)"
+    summary = f"{len(targets)} file(s)"
     if watched_dirs:
-        resumen += f" y {len(watched_dirs)} directorio(s)"
-    print(f"Vigilando {resumen}. Pulsa Ctrl-C para salir.")
+        summary += f" and {len(watched_dirs)} directory(ies)"
+    print(f"Watching {summary}. Press Ctrl-C to exit.")
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\nSaliendo del modo --watch.")
+        print("\nExiting --watch mode.")
     finally:
         with lock:
             for t in timers.values():
@@ -1374,10 +1506,10 @@ def watch_files(md_files, watch_dirs):
 
 
 def collect_md_files(args):
-    """Expande los argumentos en la lista de .md a convertir. Cada argumento puede
-    ser un fichero .md concreto o un directorio (se toman todos sus .md, sin
-    recursión). Devuelve los .md y la lista de directorios indicados (los que el
-    modo --watch vigila enteros para detectar .md nuevos)."""
+    """Expand the arguments into the list of .md files to convert. Each argument
+    can be a specific .md file or a directory (all its .md files are taken, no
+    recursion). Returns the .md files and the list of given directories (the ones
+    --watch mode watches whole to detect new .md files)."""
     md_files = []
     watch_dirs = []
     for arg in args:
@@ -1401,9 +1533,9 @@ def main():
         if arg in ("--watch", "-w"):
             watch = True
         elif arg in ("--output", "-o"):
-            # Nombre/ruta del PDF de salida; el valor va en el siguiente argumento.
+            # Output PDF name/path; the value is the next argument.
             if i + 1 >= len(rest):
-                print("La opción -o/--output necesita un nombre de fichero.")
+                print("The -o/--output option needs a file name.")
                 sys.exit(1)
             output = rest[i + 1]
             i += 1
@@ -1416,18 +1548,18 @@ def main():
         i += 1
 
     if not args:
-        print("Uso: md-to-pdf [--watch] [-o salida.pdf] <archivo.md | directorio> ...")
+        print("Usage: md-to-pdf [--watch] [-o output.pdf] <file.md | directory> ...")
         sys.exit(1)
 
     md_files, watch_dirs = collect_md_files(args)
 
-    # `-o` solo tiene sentido al convertir un único .md: con varios ficheros (o un
-    # directorio) no se puede dar un mismo nombre a todos. Se avisa y se ignora.
+    # `-o` only makes sense when converting a single .md: with several files (or a
+    # directory) you can't give them all the same name. It is warned and ignored.
     out_path = None
     if output is not None:
         if watch_dirs or len(md_files) != 1:
-            print("Aviso: -o/--output solo se aplica al convertir un único .md; "
-                  "se ignora y cada PDF se escribe junto a su .md.")
+            print("Warning: -o/--output only applies when converting a single .md; "
+                  "it is ignored and each PDF is written next to its .md.")
         else:
             out_path = Path(output)
 
@@ -1436,7 +1568,7 @@ def main():
         return
 
     if not md_files:
-        print("No hay archivos .md")
+        print("No .md files")
         sys.exit(1)
 
     if out_path is not None:

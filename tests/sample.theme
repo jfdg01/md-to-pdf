@@ -1,0 +1,13 @@
+# Reusable .theme config: document-wide defaults shared across documents.
+# Same `key: value` format as front matter. Values here are overridden by any
+# matching key in the .md's own front matter.
+locale: en
+author: Theme Default Author
+code_theme: nord
+page_size: a4
+margins: 1in
+toc_depth: 5
+text_size: 13
+title_size: 30
+h2_size: 20
+table_size: 12
