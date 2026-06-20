@@ -19,8 +19,8 @@ Grotesk, Space Mono) viajan con el repositorio en `fonts/`.
   ```
   En Windows se instalan con WeasyPrint según su documentación (GTK runtime).
 
-Las dependencias de Python (`markdown`, `weasyprint`, `pypdf`) se instalan en un
-entorno virtual propio (`.venv/`) por el script de instalación.
+Las dependencias de Python (`markdown`, `weasyprint`, `pypdf`, `watchdog`) se
+instalan en un entorno virtual propio (`.venv/`) por el script de instalación.
 
 ---
 
@@ -67,6 +67,22 @@ md-to-pdf
 ```
 
 Cada PDF se escribe junto a su `.md` de origen, con el mismo nombre.
+
+### Modo vigilancia (`--watch`)
+
+Con `--watch`, el conversor se queda observando y **regenera el PDF cada vez que
+guardas** el `.md`, con el mismo formato de salida que la conversión única:
+
+```bash
+# Vigila TODOS los .md del directorio actual (incluidos los que crees después)
+md-to-pdf --watch
+
+# Vigila solo un fichero
+md-to-pdf --watch informe.md
+```
+
+Hace una conversión inicial al arrancar y aplica un pequeño *debounce* para no
+regenerar dos veces ante guardados muy seguidos. Sal con **Ctrl-C**.
 
 ---
 

@@ -14,6 +14,7 @@ import io
 import mimetypes
 import re
 import sys
+import time
 from html import escape
 from pathlib import Path
 
@@ -852,27 +853,129 @@ def convert_one(md_path):
     return len(pdf_bytes)
 
 
+def convert_and_report(md_path):
+    """Convierte un .md informando con el formato estándar
+    (`nombre.md → nombre.pdf [OK, NN KB]` / `[ERROR: …]`). Devuelve True si fue
+    bien. Lo usan tanto la conversión única como el modo --watch."""
+    pdf_path = md_path.with_suffix(".pdf")
+    print(f"  {md_path.name} → {pdf_path.name}", end=" ", flush=True)
+    try:
+        kb = convert_one(md_path) // 1024
+        print(f"[OK, {kb} KB]")
+        return True
+    except Exception as e:
+        print(f"[ERROR: {e}]")
+        return False
+
+
+def watch_files(md_files, watch_all):
+    """Vigila los .md y regenera su PDF cada vez que se guardan (TODO #10). Con
+    `watch_all` (sin archivos en la línea de órdenes) vigila todos los .md del
+    directorio actual, incluidos los que se creen después. Aplica un pequeño
+    debounce para no regenerar dos veces ante varios eventos de guardado seguidos,
+    y sale limpiamente con Ctrl-C."""
+    try:
+        from watchdog.events import FileSystemEventHandler
+        from watchdog.observers import Observer
+    except ImportError:
+        print("El modo --watch necesita 'watchdog' (instálalo: uv pip install watchdog)")
+        sys.exit(1)
+
+    import threading
+
+    # Rutas absolutas vigiladas → Path a convertir. En modo watch_all crece con
+    # los .md nuevos que aparezcan en el directorio.
+    targets = {p.resolve(): p for p in md_files}
+    dirs = sorted({p.resolve().parent for p in md_files}) or [Path(".").resolve()]
+
+    debounce = 0.3
+    timers = {}
+    lock = threading.Lock()
+
+    def regenerate(path):
+        with lock:
+            timers.pop(path, None)
+        convert_and_report(targets[path])
+
+    def schedule(path):
+        with lock:
+            if path in timers:
+                timers[path].cancel()
+            timers[path] = threading.Timer(debounce, regenerate, args=[path])
+            timers[path].start()
+
+    def target_for(src_path):
+        p = Path(src_path).resolve()
+        if p.suffix != ".md":
+            return None
+        if p in targets:
+            return p
+        if watch_all:
+            targets[p] = p   # convertir usando la ruta absoluta
+            return p
+        return None
+
+    class Handler(FileSystemEventHandler):
+        def on_modified(self, event):
+            if not event.is_directory and target_for(event.src_path):
+                schedule(Path(event.src_path).resolve())
+
+        on_created = on_modified
+
+        def on_moved(self, event):
+            # Algunos editores guardan moviendo un temporal sobre el fichero.
+            dest = getattr(event, "dest_path", "")
+            if dest and target_for(dest):
+                schedule(Path(dest).resolve())
+
+    observer = Observer()
+    for d in dirs:
+        observer.schedule(Handler(), str(d), recursive=False)
+    observer.start()
+
+    # Conversión inicial para dejar los PDF al día al arrancar.
+    for md_path in md_files:
+        convert_and_report(md_path)
+    print(f"Vigilando {'el directorio actual' if watch_all else f'{len(targets)} archivo(s)'}"
+          f". Pulsa Ctrl-C para salir.")
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nSaliendo del modo --watch.")
+    finally:
+        with lock:
+            for t in timers.values():
+                t.cancel()
+        observer.stop()
+        observer.join()
+
+
 def main():
-    if len(sys.argv) > 1:
-        md_files = [Path(p) for p in sys.argv[1:]]
+    watch = False
+    files = []
+    for arg in sys.argv[1:]:
+        if arg in ("--watch", "-w"):
+            watch = True
+        else:
+            files.append(arg)
+
+    watch_all = not files
+    if files:
+        md_files = [Path(p) for p in files]
     else:
         md_files = sorted(Path(".").glob("*.md"))
+
+    if watch:
+        watch_files(md_files, watch_all)
+        return
 
     if not md_files:
         print("No hay archivos .md")
         sys.exit(1)
 
-    failures = 0
-    for md_path in md_files:
-        pdf_path = md_path.with_suffix(".pdf")
-        print(f"  {md_path.name} → {pdf_path.name}", end=" ", flush=True)
-        try:
-            kb = convert_one(md_path) // 1024
-            print(f"[OK, {kb} KB]")
-        except Exception as e:
-            failures += 1
-            print(f"[ERROR: {e}]")
-
+    failures = sum(not convert_and_report(p) for p in md_files)
     if failures:
         sys.exit(1)
 
