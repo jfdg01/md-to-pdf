@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Instalador Linux: crea el venv, instala dependencias y enlaza el launcher en
-# ~/.local/bin para poder llamar a "md-to-pdf" desde cualquier sitio.
+# Instalador Linux: crea el venv con uv, instala dependencias desde el lockfile y
+# enlaza el launcher en ~/.local/bin para llamar a "md-to-pdf" desde cualquier sitio.
 set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Creando venv en $DIR/.venv ..."
-python3 -m venv "$DIR/.venv"
-"$DIR/.venv/bin/pip" install --upgrade pip
-"$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt"
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv no está instalado. Instálalo con:"
+  echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+  exit 1
+fi
+
+echo "Creando .venv e instalando dependencias con uv ..."
+( cd "$DIR" && uv sync )
 
 chmod +x "$DIR/md-to-pdf"
 mkdir -p "$HOME/.local/bin"

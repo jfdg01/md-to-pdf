@@ -878,7 +878,7 @@ def watch_files(md_files, watch_all):
         from watchdog.events import FileSystemEventHandler
         from watchdog.observers import Observer
     except ImportError:
-        print("El modo --watch necesita 'watchdog' (instálalo: uv pip install watchdog)")
+        print("El modo --watch necesita 'watchdog' (instálalo con: uv sync)")
         sys.exit(1)
 
     import threading

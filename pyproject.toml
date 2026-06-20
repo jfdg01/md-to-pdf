@@ -1,0 +1,18 @@
+[project]
+name = "md-to-pdf"
+version = "1.0.0"
+description = "Convierte Markdown en PDF con portada, índices navegables y cabecera/pie, usando WeasyPrint (Python puro, sin navegador)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "markdown",
+    "weasyprint",
+    "pypdf",
+    "watchdog",
+    "pygments>=2.20.0",
+]
+
+[tool.uv]
+# Es una aplicación de un solo script, no una librería instalable: que uv no
+# intente construir/instalar el proyecto como paquete, solo sus dependencias.
+package = false

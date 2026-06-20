@@ -13,21 +13,28 @@ Grotesk, Space Mono) viajan con el repositorio en `fonts/`.
 ## Requisitos
 
 - **Python 3** (3.10+).
+- **[uv](https://docs.astral.sh/uv/)** para gestionar el entorno y las
+  dependencias. Si no lo tienes:
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh   # Linux/macOS
+  # Windows: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+  ```
 - Las librerías de sistema de WeasyPrint (Pango/Cairo). En Ubuntu/Debian:
   ```bash
   sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0
   ```
   En Windows se instalan con WeasyPrint según su documentación (GTK runtime).
 
-Las dependencias de Python (`markdown`, `weasyprint`, `pypdf`, `watchdog`) se
-instalan en un entorno virtual propio (`.venv/`) por el script de instalación.
+Las dependencias de Python (`markdown`, `weasyprint`, `pypdf`, `watchdog`,
+`pygments`) se declaran en `pyproject.toml` y se fijan en `uv.lock`; `uv sync` las instala en un
+entorno virtual propio (`.venv/`) de forma reproducible.
 
 ---
 
 ## Instalación
 
-El instalador crea el `.venv`, instala dependencias y registra el comando global
-`md-to-pdf`.
+El instalador llama a `uv sync` (crea el `.venv` e instala las dependencias del
+lockfile) y registra el comando global `md-to-pdf`.
 
 ### Linux / Ubuntu
 ```bash
