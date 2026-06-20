@@ -4,6 +4,8 @@ subtitle: Verificación del conversor
 comment: Curso 2025/2026
 author: Usuario de Prueba
 locale: es
+bibliography: test_refs.bib
+citation_style: numeric
 ---
 
 ## Introducción
@@ -16,7 +18,8 @@ un aspecto distinto del PDF resultante.
 
 El objetivo es confirmar que portada, índice, cabecera, pie, fuentes,
 saltos de página y numeración automática de figuras y tablas funcionan
-correctamente.
+correctamente. El enfoque sigue trabajos previos sobre evaluación
+automática de documentos [@perez2020].
 
 A continuación se muestra la primera imagen del documento:
 
@@ -427,6 +430,14 @@ la primera imagen de la sección 7 será *Figura 7.1*.
 > en un único bloque visual con borde izquierdo y fondo gris claro.
 
 > Segunda cita independiente, separada de la anterior.
+
+### Citas bibliográficas
+
+Las citas se escriben con `[@clave]` y se enlazan a la sección de
+**Referencias** (generada sola al final con las entradas citadas). Una cita
+suelta [@garcia2019] y varias juntas [@perez2020; @lopez2021] producen una
+única marca con todos los números. El estilo (`numeric` o `author-year`) se
+elige en el front matter con `citation_style`.
 
 ### Separador horizontal
 

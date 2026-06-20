@@ -5,6 +5,8 @@ comment: June 2026
 author: Test User
 logo: foto1.jpg
 locale: en
+bibliography: test_refs_en.bib
+citation_style: author-year
 ---
 
 ## Introduction
@@ -40,6 +42,10 @@ def greet(name):
 
 Figure and table counters reset on each section, so the first figure here is
 labelled **Figure 2.1**.
+
+Citations use `[@key]` and link to the auto-generated **References** section.
+A single citation [@brown2018] and a grouped one [@smith2020; @brown2018] render
+author-year markers, since this document sets `citation_style: author-year`.
 
 <!-- caption: An aerial view of a forest -->
 ![Aerial view of a forest](foto2.jpg)

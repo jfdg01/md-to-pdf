@@ -64,6 +64,8 @@ STRINGS = {
         "figure":      "Figura",
         "table":       "Tabla",
         "code_block":  "Bloque de código",
+        "references":  "Referencias",
+        "no_date":     "s.f.",
         "by":          "Realizado por",
     },
     "en": {
@@ -74,6 +76,8 @@ STRINGS = {
         "figure":      "Figure",
         "table":       "Table",
         "code_block":  "Code block",
+        "references":  "References",
+        "no_date":     "n.d.",
         "by":          "By",
     },
 }
@@ -356,6 +360,15 @@ caption { caption-side: bottom; font-size: 12pt; color: #555; padding-top: 6px; 
 .code-block > pre, .code-block > .codehilite { margin: 0; }
 .code-label { font-size: 12pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
 
+/* ── Citas y bibliografía ── */
+a.cite { text-decoration: none; }
+.ref-entry {
+    display: block;
+    margin: 6px 0;
+    padding-left: 1.6em;
+    text-indent: -1.6em;   /* sangría francesa: la 1ª línea sobresale */
+}
+
 /* ── Mantener junto al elemento anterior (TODO #6) ──
    Evita el salto de página *antes* del elemento y permite que el propio
    elemento se parta si no cabe, de modo que quede pegado al texto previo.
@@ -470,6 +483,12 @@ _META_ALIASES = {
     "margin_right": "margin_right", "margen_derecho": "margin_right",
     "margin_bottom": "margin_bottom", "margen_inferior": "margin_bottom",
     "margin_left": "margin_left", "margen_izquierdo": "margin_left",
+    "bibliography": "bibliography", "bibliografia": "bibliography",
+    "bibliografía": "bibliography", "bib": "bibliography",
+    "references": "bibliography", "referencias": "bibliography",
+    "citation_style": "citation_style", "citationstyle": "citation_style",
+    "cite_style": "citation_style", "estilo_cita": "citation_style",
+    "estilo_citas": "citation_style", "estilo_de_cita": "citation_style",
 }
 
 
@@ -483,7 +502,7 @@ def parse_front_matter(text):
             "logo": "", "lang": "es", "code_theme": "", "numbering": "true",
             "page_size": "", "orientation": "", "margins": "",
             "margin_top": "", "margin_right": "", "margin_bottom": "",
-            "margin_left": ""}
+            "margin_left": "", "bibliography": "", "citation_style": ""}
     lines = text.splitlines()
     body_start = 0
 
@@ -594,6 +613,216 @@ def resolve_cross_refs(html, figures, tables, code_blocks):
         return f'<a href="#{aid}" class="xref">{escape(label)}</a>'
 
     return _XREF_RE.sub(repl, html)
+
+
+# ─────────────────────── Bibliografía y citas ───────────────────────
+# Cita en el cuerpo: `[@clave]` o varias juntas `[@clave1; @clave2]`. Cada clave
+# se sustituye por una marca enlazada (numérica `[1]` o autor-año `(Pérez, 2020)`)
+# que salta a su entrada en la sección de referencias, generada con las entradas
+# realmente citadas. La bibliografía se lee de un `.bib` (BibTeX) indicado en el
+# front matter con `bibliography:` (ruta relativa al .md, como `logo`).
+_CITE_GROUP_RE = re.compile(r'\[@[^\]]+\]')
+_CITE_KEY_RE = re.compile(r'@([\w:.\-]+)')
+_INLINE_CODE_RE = re.compile(r'`+[^`]*`+')
+
+# Estilos de cita admitidos (clave normalizada → estilo canónico).
+_CITE_STYLES = {
+    "": "numeric", "numeric": "numeric", "numerico": "numeric",
+    "numérico": "numeric", "numerica": "numeric", "numérica": "numeric",
+    "number": "numeric", "numero": "numeric",
+    "author-year": "author-year", "author_year": "author-year",
+    "authoryear": "author-year", "autor-año": "author-year",
+    "autor-ano": "author-year", "autor_año": "author-year",
+    "autor-anyo": "author-year", "autoraño": "author-year",
+}
+
+
+def resolve_citation_style(meta):
+    """Resuelve `citation_style`: 'numeric' (def.) o 'author-year'. Avisa y cae en
+    'numeric' si el valor es desconocido (igual que con `code_theme`)."""
+    name = (meta.get("citation_style") or "").strip().lower()
+    if name in _CITE_STYLES:
+        return _CITE_STYLES[name]
+    print(f"    (aviso: estilo de cita '{name}' desconocido; uso numeric)",
+          file=sys.stderr)
+    return "numeric"
+
+
+def load_bibliography(md_path, meta):
+    """Carga el `.bib` indicado en `bibliography:` (ruta relativa al .md, como el
+    logo) y devuelve sus entradas (dict clave→entrada de pybtex, insensible a
+    mayúsculas). Sin campo `bibliography`, devuelve {} (no hay bibliografía).
+    Lanza ValueError si el fichero no existe o falta pybtex."""
+    field = (meta.get("bibliography") or "").strip()
+    if not field:
+        return {}
+    p = Path(field)
+    bib_path = p if p.is_absolute() else md_path.parent / p
+    if not bib_path.exists():
+        raise ValueError(f"no encuentro la bibliografía '{field}'")
+    try:
+        from pybtex.database import parse_file
+    except ImportError:
+        raise ValueError("la bibliografía necesita 'pybtex' (instálalo con: uv sync)")
+    return parse_file(str(bib_path)).entries
+
+
+def _ref_anchor(key):
+    """Ancla estable para una entrada de la bibliografía (`ref-<clave>`)."""
+    return "ref-" + re.sub(r'[^a-z0-9]+', '-', key.lower()).strip('-')
+
+
+def _clean(value):
+    """Texto plano de un campo BibTeX: quita llaves y espacios sobrantes."""
+    return str(value).replace("{", "").replace("}", "").strip()
+
+
+def _persons(entry):
+    return entry.persons.get("author") or entry.persons.get("editor") or []
+
+
+def _person_last(p):
+    return _clean(" ".join(p.prelast_names + p.last_names))
+
+
+def _person_full(p):
+    """Apellido(s) + iniciales: «Pérez, J. M.»."""
+    last = _person_last(p)
+    initials = " ".join(f"{_clean(n)[0]}." for n in (p.first_names + p.middle_names)
+                        if _clean(n))
+    if last and initials:
+        return f"{last}, {initials}"
+    return last or initials
+
+
+def _entry_year(entry, strings):
+    return _clean(entry.fields.get("year", "")) or strings["no_date"]
+
+
+def _authors_full(entry, lang):
+    """Lista de autores para la entrada de referencias («A, B y C»)."""
+    names = [_person_full(p) for p in _persons(entry)]
+    if not names:
+        return ""
+    if len(names) == 1:
+        return names[0]
+    conn = " y " if lang == "es" else " & "
+    return ", ".join(names[:-1]) + conn + names[-1]
+
+
+def _authors_short(entry, lang):
+    """Apellidos abreviados para la marca autor-año («Pérez», «Pérez et al.»)."""
+    lasts = [_person_last(p) for p in _persons(entry)]
+    if not lasts:
+        return _clean(entry.fields.get("title", "")) or "?"
+    if len(lasts) == 1:
+        return lasts[0]
+    if len(lasts) == 2:
+        conn = " y " if lang == "es" else " & "
+        return lasts[0] + conn + lasts[1]
+    return f"{lasts[0]} et al."
+
+
+def _format_reference(entry, lang, strings):
+    """Entrada formateada de forma consistente: «Autores (año). *Título*. Soporte.»"""
+    fields = entry.fields
+    title = _clean(fields.get("title", ""))
+    container = _clean(fields.get("journal") or fields.get("booktitle")
+                       or fields.get("publisher") or fields.get("school")
+                       or fields.get("institution") or "")
+    authors = _authors_full(entry, lang)
+    parts = [f"{authors} ({_entry_year(entry, strings)})." if authors
+             else f"({_entry_year(entry, strings)})."]
+    if title:
+        parts.append(f"*{title}*.")
+    if container:
+        parts.append(f"{container}.")
+    return " ".join(parts)
+
+
+def process_citations(body_md, bib_entries, style, lang, strings):
+    """Sustituye las citas `[@clave]` del cuerpo por marcas enlazadas y construye
+    la sección de referencias con las entradas citadas. Devuelve
+    (markdown_con_marcas, markdown_referencias|None).
+
+    Numera las claves por orden de primera aparición. Las marcas saltan al ancla
+    `ref-<clave>` de la entrada (mecanismo de anclas del TODO #4). Avisa de las
+    claves ausentes en el `.bib` y deja `@clave` visible. Ignora las citas dentro
+    de vallas de código."""
+    cited = []            # claves citadas, en orden de primera aparición
+    number = {}           # clave (minúsculas) → número
+
+    def number_for(key):
+        k = key.lower()
+        if k not in number:
+            cited.append(key)
+            number[k] = len(cited)
+        return number[k]
+
+    def render_group(m):
+        parts = []
+        for key in _CITE_KEY_RE.findall(m.group(0)):
+            if key not in bib_entries:
+                print(f"    (aviso: cita '@{key}' no está en la bibliografía)",
+                      file=sys.stderr)
+                parts.append(escape(f"@{key}"))
+                continue
+            num = number_for(key)
+            if style == "author-year":
+                label = f"{_authors_short(bib_entries[key], lang)}, " \
+                        f"{_entry_year(bib_entries[key], strings)}"
+            else:
+                label = str(num)
+            parts.append(f'<a href="#{_ref_anchor(key)}" class="cite">'
+                         f'{escape(label)}</a>')
+        if style == "author-year":
+            return "(" + "; ".join(parts) + ")"
+        return "[" + ", ".join(parts) + "]"
+
+    def sub_line(line):
+        # Sustituye fuera de los spans de código en línea (`...`), para no tocar
+        # un `[@clave]` escrito como ejemplo entre acentos graves.
+        parts, last = [], 0
+        for m in _INLINE_CODE_RE.finditer(line):
+            parts.append(_CITE_GROUP_RE.sub(render_group, line[last:m.start()]))
+            parts.append(m.group(0))
+            last = m.end()
+        parts.append(_CITE_GROUP_RE.sub(render_group, line[last:]))
+        return "".join(parts)
+
+    out, in_fence = [], False
+    for line in body_md.split("\n"):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            out.append(line)
+        elif in_fence:
+            out.append(line)
+        else:
+            out.append(sub_line(line))
+    new_body = "\n".join(out)
+
+    if not cited:
+        return new_body, None
+
+    # Orden de la lista: por número de cita (numeric) o alfabético por autor
+    # (author-year). Cada entrada lleva su ancla `ref-<clave>`.
+    if style == "author-year":
+        ordered = sorted(cited, key=lambda k: (
+            _person_last(_persons(bib_entries[k])[0]).lower()
+            if _persons(bib_entries[k])
+            else _clean(bib_entries[k].fields.get("title", "")).lower(),
+            _entry_year(bib_entries[k], strings)))
+    else:
+        ordered = cited
+
+    lines = [f'## {strings["references"]}', ""]
+    for key in ordered:
+        marker = "" if style == "author-year" else f'[{number[key.lower()]}] '
+        text = _format_reference(bib_entries[key], lang, strings)
+        lines.append(f'<span id="{_ref_anchor(key)}" class="ref-entry">'
+                     f'{marker}{text}</span>')
+        lines.append("")
+    return new_body, "\n".join(lines)
 
 
 # ─────────────────────── Numeración de figuras/tablas/código ───────────────────────
@@ -759,7 +988,8 @@ def cover_html(meta, logo_uri, strings, page_size):
 </html>"""
 
 
-def content_html(meta, body_md, strings, code_style, page_size):
+def content_html(meta, body_md, strings, code_style, page_size,
+                 bib_entries=None, citation_style="numeric"):
     """Índice + índices + cuerpo en un único HTML. Lanza ValueError si algún
     elemento carece de descripción (TODO #7)."""
     md = markdown.Markdown(
@@ -768,6 +998,13 @@ def content_html(meta, body_md, strings, code_style, page_size):
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}"}},
     )
+    # Citas y bibliografía: se procesan antes de numerar para que la sección de
+    # «Referencias» (un `##` más) entre en la numeración, el índice y el outline.
+    if bib_entries:
+        body_md, refs_md = process_citations(
+            body_md, bib_entries, citation_style, meta.get("lang", "es"), strings)
+        if refs_md:
+            body_md = f"{body_md}\n\n{refs_md}"
     # Numeración automática de secciones (activada por defecto): se aplica al
     # Markdown antes de convertir, para que el número quede reflejado en cuerpo,
     # índice y outline. Se desactiva con `numbering: false`.
@@ -842,8 +1079,11 @@ def convert_one(md_path):
     base_url = md_path.resolve().parent.as_uri() + "/"
     code_style = resolve_code_style(meta.get("code_theme"))
     page_size = resolve_page_size(meta)
+    bib_entries = load_bibliography(md_path, meta)
+    citation_style = resolve_citation_style(meta) if bib_entries else "numeric"
 
-    html = content_html(meta, body_md, strings, code_style, page_size)
+    html = content_html(meta, body_md, strings, code_style, page_size,
+                        bib_entries, citation_style)
     content_pdf = weasyprint.HTML(string=html, base_url=base_url).write_pdf()
     cover_pdf = weasyprint.HTML(
         string=cover_html(meta, logo_uri, strings, page_size),

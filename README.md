@@ -26,7 +26,7 @@ Grotesk, Space Mono) viajan con el repositorio en `fonts/`.
   En Windows se instalan con WeasyPrint según su documentación (GTK runtime).
 
 Las dependencias de Python (`markdown`, `weasyprint`, `pypdf`, `watchdog`,
-`pygments`) se declaran en `pyproject.toml` y se fijan en `uv.lock`; `uv sync` las instala en un
+`pygments`, `pybtex`) se declaran en `pyproject.toml` y se fijan en `uv.lock`; `uv sync` las instala en un
 entorno virtual propio (`.venv/`) de forma reproducible.
 
 ---
@@ -139,9 +139,12 @@ en los encabezados.
 | `page_size`| Tamaño de página: `a4` (def.), `a5`, `a3`, `letter`, `legal`… | Todo el documento |
 | `orientation`| `portrait` (def.) o `landscape`                         | Todo el documento |
 | `margins`  | Márgenes del cuerpo en CSS (`1.15in 0.85in 0.95in 0.85in`) | Todo el documento |
+| `bibliography`| Ruta a un fichero `.bib` (BibTeX) para citas y referencias | Sección «Referencias» |
+| `citation_style`| `numeric` (def., `[1]`) o `author-year` (`(Pérez, 2020)`) | Marcas de cita |
 
 Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`,
-`numeracion`, `tamaño`, `orientacion`, `margenes`…).
+`numeracion`, `tamaño`, `orientacion`, `margenes`, `bibliografia`,
+`estilo_cita`…).
 Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no defines
 `logo` pero existe un `logo.*` junto al `.md`, se usa automáticamente; con
 `logo: none` lo desactivas.
@@ -172,6 +175,59 @@ formato es `tipo-sección-índice`, las mismas anclas que se numeran solas). Se
 convierte en un enlace cuyo texto visible es el número del elemento («Figura
 2.1») y que salta a él al hacer clic. Si el ancla no existe, se avisa por consola
 y la marca se deja tal cual para que la localices.
+
+### Citas y bibliografía
+
+Para citar fuentes, indica un fichero **BibTeX** en el front matter con
+`bibliography:` (ruta relativa al `.md`, igual que `logo:`) y escribe las citas
+en el cuerpo con `[@clave]`:
+
+```markdown
+---
+title: Mi informe
+bibliography: refs.bib
+citation_style: numeric   # numeric (def.) | author-year
+---
+
+## Introducción
+
+El método sigue trabajos previos [@perez2020]. Otros lo amplían
+[@garcia2019; @lopez2021].
+```
+
+Con un `refs.bib` como:
+
+```bibtex
+@article{perez2020,
+  author  = {Pérez, Juan Manuel and García, Ana},
+  title   = {Métodos de evaluación automática},
+  journal = {Revista de Computación},
+  year    = {2020},
+}
+@book{garcia2019,
+  author    = {García, Ana},
+  title     = {Fundamentos de sistemas},
+  publisher = {Editorial Técnica},
+  year      = {2019},
+}
+```
+
+Cada `[@clave]` se sustituye por una **marca enlazada** que salta a su entrada:
+
+- `citation_style: numeric` (por defecto) → `[1]`, y varias juntas → `[2, 3]`.
+- `citation_style: author-year` → `(Pérez y García, 2020)`, y varias →
+  `(García, 2019; López et al., 2021)`.
+
+Al final del documento se genera sola una sección **«Referencias»**
+(«References» en `locale: en`) con **solo las entradas citadas**, formateadas de
+forma consistente. Es una sección normal: **se numera** como una más (`8.
+Referencias`) y aparece en el índice y en los marcadores del PDF. El orden es por
+aparición (numeric) o alfabético por autor (author-year).
+
+Si una `[@clave]` no está en el `.bib`, se avisa por consola y la marca se deja
+visible (`[@clave]`) para que la localices. Si el nombre de `citation_style` es
+desconocido, se avisa y se usa `numeric`. Las citas dentro de bloques o de
+`código en línea` no se tocan.
 
 ### Tamaño de página y márgenes
 
