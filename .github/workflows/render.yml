@@ -22,10 +22,10 @@ jobs:
           pip install -r requirements.txt
 
       - name: Convert test.md to PDF
-        run: python3 src/md_to_pdf.py test.md
+        run: python3 src/md_to_pdf.py tests/test.md
 
       - name: Upload PDF
         uses: actions/upload-artifact@v4
         with:
           name: test-pdf
-          path: test.pdf
+          path: tests/test.pdf
