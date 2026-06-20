@@ -403,16 +403,23 @@ def _css_str(s):
 # cascade order (same or higher specificity). The header/footer keys are applied
 # separately, inside the @page margin boxes.
 FONT_SIZE_SELECTORS = {
-    "text_size":  "html, body",                # the body text
-    "title_size": ".cover h1",                 # the cover title
-    "h1_size":    ".body h1",                   # body headings, per level
-    "h2_size":    ".body h2",
-    "h3_size":    ".body h3",
-    "h4_size":    ".body h4",
-    "h5_size":    ".body h5",
-    "h6_size":    ".body h6",
-    "code_size":  "pre, code, .codehilite pre",  # code blocks and inline code
-    "table_size": "table",                     # tables
+    "text_size":     "html, body",             # the body text
+    "title_size":    ".cover h1",              # the cover title
+    "subtitle_size": ".cover .subtitle",       # the cover subtitle
+    "comment_size":  ".cover .meta-line",      # the cover comment line
+    "author_size":   ".cover .author",         # the cover author line
+    "h1_size":       ".body h1",               # body headings, per level
+    "h2_size":       ".body h2",
+    "h3_size":       ".body h3",
+    "h4_size":       ".body h4",
+    "h5_size":       ".body h5",
+    "h6_size":       ".body h6",
+    "code_size":     "pre, code, .codehilite pre",  # code blocks and inline code
+    "table_size":    "table",                  # tables
+    # figure captions, table captions, and code-block labels (one knob)
+    "caption_size":  "figcaption, caption, .code-label",
+    # the "Contents" / "List of …" headings on the generated index pages
+    "index_heading_size": ".toc-page h2, .idx-block h2",
 }
 
 # Default size of the page header and footer (the @page margin boxes).
@@ -622,6 +629,12 @@ _META_ALIASES = {
     "title_size": "title_size", "tamano_titulo": "title_size",
     "tamaño_titulo": "title_size", "tamaño_título": "title_size",
     "tamano_portada": "title_size", "tamaño_portada": "title_size",
+    "subtitle_size": "subtitle_size", "tamano_subtitulo": "subtitle_size",
+    "tamaño_subtitulo": "subtitle_size", "tamaño_subtítulo": "subtitle_size",
+    "comment_size": "comment_size", "tamano_comentario": "comment_size",
+    "tamaño_comentario": "comment_size",
+    "author_size": "author_size", "tamano_autor": "author_size",
+    "tamaño_autor": "author_size",
     "h1_size": "h1_size", "tamano_h1": "h1_size", "tamaño_h1": "h1_size",
     "h2_size": "h2_size", "tamano_h2": "h2_size", "tamaño_h2": "h2_size",
     "h3_size": "h3_size", "tamano_h3": "h3_size", "tamaño_h3": "h3_size",
@@ -633,6 +646,13 @@ _META_ALIASES = {
     "table_size": "table_size", "tamano_tabla": "table_size",
     "tamaño_tabla": "table_size", "tamano_tablas": "table_size",
     "tamaño_tablas": "table_size",
+    "caption_size": "caption_size", "tamano_pie_figura": "caption_size",
+    "tamaño_pie_figura": "caption_size", "tamano_leyenda": "caption_size",
+    "tamaño_leyenda": "caption_size",
+    "index_heading_size": "index_heading_size",
+    "tamano_titulo_indice": "index_heading_size",
+    "tamaño_titulo_indice": "index_heading_size",
+    "tamaño_título_índice": "index_heading_size",
     "header_size": "header_size", "tamano_cabecera": "header_size",
     "tamaño_cabecera": "header_size",
     "footer_size": "footer_size", "tamano_pie": "footer_size",
@@ -662,28 +682,43 @@ DEFAULT_META = {
     "margin_left": "", "bibliography": "", "citation_style": "",
     "theme": "",
     "text_size": "", "title_size": "",
+    "subtitle_size": "", "comment_size": "", "author_size": "",
     "h1_size": "", "h2_size": "", "h3_size": "", "h4_size": "",
     "h5_size": "", "h6_size": "",
-    "code_size": "", "table_size": "",
+    "code_size": "", "table_size": "", "caption_size": "",
+    "index_heading_size": "",
     "header_size": "", "footer_size": "",
     "toc_size": "", "toc1_size": "", "toc2_size": "", "toc3_size": "",
     "toc4_size": "",
 }
 
 
+# Free-text keys whose value may legitimately contain a `#` (e.g. a title like
+# "Issue #42"), so inline-comment stripping is skipped for them.
+_PROSE_KEYS = {"title", "subtitle", "comment", "author"}
+
+
 def parse_kv_lines(lines):
     """Read `key: value` lines (front matter or `.theme`) into a dict holding
     only the keys that are *present* (canonicalized via _META_ALIASES). It does
     not apply defaults: this way the caller knows which keys were actually set
-    and can give some sources precedence over others."""
+    and can give some sources precedence over others.
+
+    An inline comment is supported: the first `#` that is preceded by whitespace
+    starts a comment and is dropped (`key: value   # note` keeps just `value`).
+    A `#` with no space before it (e.g. a `#rrggbb` color) is left intact. The
+    free-text keys in _PROSE_KEYS keep everything (a title may contain `#`)."""
     meta = {}
     for raw in lines:
         if ":" not in raw:
             continue
         key, val = raw.split(":", 1)
         canon = _META_ALIASES.get(key.strip().lower())
-        if canon:
-            meta[canon] = val.strip().strip('"').strip("'").strip()
+        if not canon:
+            continue
+        if canon not in _PROSE_KEYS:
+            val = re.split(r"\s+#", val, maxsplit=1)[0]
+        meta[canon] = val.strip().strip('"').strip("'").strip()
     return meta
 
 

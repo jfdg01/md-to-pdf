@@ -247,10 +247,11 @@ theme: house-style.theme   # path relative to the .md
 Precedence is **built-in defaults < `.theme` < the document's front matter**, so
 any key the document sets itself overrides the theme. A `.theme` can hold any
 front-matter key (page size, margins, `code_theme`, citation style, font sizes,
-even `author`), but not `theme` itself (themes don't chain). Comments use `#` on
-their own line — an inline comment *after* a value is treated as part of the
-value, so keep each `key: value` on a clean line. The optional `---` delimiters
-are allowed, so a front matter can be reused as a theme.
+even `author`), but not `theme` itself (themes don't chain). A `#` starts a
+comment — either a whole line or inline after a value (`text_size: 14  # body`);
+a `#` with no space before it (like a `#rrggbb` color) is kept as part of the
+value. The optional `---` delimiters are allowed, so a front matter can be
+reused as a theme.
 
 Copy [`template.theme`](template.theme) to get started: it lists every key set
 to its built-in default, so it renders identically to no theme until you change
@@ -285,10 +286,24 @@ To customize the default palette, edit the `CODE_PALETTE` dict near the top of
 
 ### Font sizes
 
-Per-section font sizes can be set in the front matter: `text_size`,
-`title_size`, `h1_size`…`h6_size`, `code_size`, `table_size`, `header_size`,
-`footer_size`. A bare number is points (`14` → `14pt`); any CSS unit (`1.2em`,
-`12px`) is kept as-is.
+Every piece of rendered text has a size key, settable in the front matter or a
+theme. A bare number is points (`14` → `14pt`); any CSS unit (`1.2em`, `12px`)
+is kept as-is.
+
+| Key                  | Sizes                                              | Default  |
+|----------------------|----------------------------------------------------|----------|
+| `text_size`          | Body text                                          | `14pt`   |
+| `title_size`         | Cover title                                        | `27pt`   |
+| `subtitle_size`      | Cover subtitle                                     | `16.5pt` |
+| `comment_size`       | Cover comment line                                 | `13pt`   |
+| `author_size`        | Cover author line (footer uses `footer_size`)      | `14pt`   |
+| `h1_size`…`h6_size`  | Body headings, per level                           | varies   |
+| `code_size`          | Code blocks and inline code                        | `11.5pt` |
+| `table_size`         | Tables                                             | `13pt`   |
+| `caption_size`       | Figure captions, table captions, code-block labels | `12pt`   |
+| `index_heading_size` | "Contents" / "List of …" page headings             | `18.5pt` |
+| `header_size`        | Running header                                     | `9.5pt`  |
+| `footer_size`        | Running footer and page number                     | `9.5pt`  |
 
 The **table-of-contents** lines have their own sizes, per nesting level:
 `toc_size` sets every level at once, while `toc1_size`…`toc4_size` override an

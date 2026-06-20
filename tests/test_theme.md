@@ -9,7 +9,8 @@ code_theme: monokai
 
 This document sets only `theme: sample.theme`, plus a `code_theme: monokai`
 override. Everything else — `locale`, `author`, `page_size`, `margins`,
-`toc_depth`, and the font sizes — comes from `sample.theme`.
+`toc_depth`, and the font sizes (including a larger `caption_size`) — comes from
+`sample.theme`, which also uses inline `# comments` after some values.
 
 Precedence is `DEFAULT_META < .theme < front matter`, so `code_theme: monokai`
 here wins over the theme's `nord`, while `author: Theme Default Author` comes

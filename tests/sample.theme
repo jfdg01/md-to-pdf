@@ -7,7 +7,9 @@ code_theme: nord
 page_size: a4
 margins: 1in
 toc_depth: 5
-text_size: 13
+text_size: 13         # inline comments after a value are supported
 title_size: 30
 h2_size: 20
 table_size: 12
+caption_size: 14      # bigger figure/table/code captions
+subtitle_size: 18     # bigger cover subtitle
