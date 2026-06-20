@@ -301,19 +301,21 @@ html, body {
 .idx-block { margin-bottom: 32px; }
 .idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18.5pt; margin-bottom: 16px; }
 .doc-index { list-style: none; margin: 0; padding: 0; }
-.doc-index li { padding: 5px 0; border-bottom: 1px dotted #ddd; font-size: 14pt; }
+.doc-index li { padding: 5px 0; font-size: 14pt; }
 .doc-index a { text-decoration: none; color: #1a1a1a; }
 .idx-label { font-weight: bold; }
 
 /* ── Contenido ── */
 a { color: #5a8fc4; }
-h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', Arial, sans-serif; }
 h1 { font-size: 24.5pt; margin-bottom: 16px; }
 /* Cada sección de nivel ## empieza en página nueva. El salto forzado tras el
    índice y este se fusionan, así que no aparece una página en blanco. */
 .body h2 { break-before: page; }
 h2 { font-size: 18.5pt; margin-top: 28px; }
 h3 { font-size: 15pt; margin-top: 20px; color: #222; }
+h4 { font-size: 13.5pt; margin-top: 18px; color: #333; }
+h5 { font-size: 12.5pt; margin-top: 16px; color: #444; }
 code {
     font-family: 'Space Mono', 'DejaVu Sans Mono', monospace;
     background: #f4f4f4;
@@ -382,10 +384,10 @@ a.cite { text-decoration: none; }
 .keep-with-prev .codehilite,
 .keep-with-prev pre { break-inside: auto; }
 
-/* Outline del PDF: solo las secciones del cuerpo, no la portada ni los índices. */
+/* Outline del PDF: solo las secciones del cuerpo, no la portada ni los índices.
+   Qué niveles concretos entran (y las marcas individuales) lo añade outline_css()
+   según la profundidad del índice, para que coincidan con el índice de contenidos. */
 h1, h2, h3, h4, h5, h6 { bookmark-level: none; }
-.body h2 { bookmark-level: 1; }
-.body h3 { bookmark-level: 2; }
 """
 
 
@@ -423,6 +425,32 @@ def resolve_margins(meta):
     sides = ("margin_top", "margin_right", "margin_bottom", "margin_left")
     return " ".join((meta.get(k) or "").strip() or d
                     for k, d in zip(sides, DEFAULT_MARGINS))
+
+
+# Profundidad por defecto del índice de contenidos: hasta los `####` (nivel 4).
+# El `#####` (nivel 5) no aparece salvo que se suba esta profundidad con
+# `toc_depth` o se marque el encabezado concreto con `<!-- toc -->`.
+DEFAULT_TOC_DEPTH = 4
+
+
+def resolve_toc_depth(meta):
+    """Resuelve `toc_depth`: nivel máximo de encabezado que entra en el índice de
+    contenidos (3 = hasta `###`, 4 = hasta `####`, 5 = hasta `#####`). Por defecto
+    4. Acepta '3'/'4'/'5', 'h4', '####'… Avisa y cae en el valor por defecto si el
+    valor es desconocido (igual que con `code_theme`)."""
+    raw = (meta.get("toc_depth") or "").strip().lower()
+    if not raw:
+        return DEFAULT_TOC_DEPTH
+    if raw.count("#") >= 2:
+        depth = raw.count("#")
+    else:
+        m = re.search(r"[2-6]", raw)
+        depth = int(m.group(0)) if m else 0
+    if 2 <= depth <= 6:
+        return depth
+    print(f"    (aviso: profundidad de índice '{raw}' no válida; uso "
+          f"{DEFAULT_TOC_DEPTH})", file=sys.stderr)
+    return DEFAULT_TOC_DEPTH
 
 
 def page_css(meta, strings, page_size):
@@ -472,6 +500,11 @@ _META_ALIASES = {
     "tema_código": "code_theme",
     "numbering": "numbering", "numeracion": "numbering",
     "numeración": "numbering", "numerar": "numbering",
+    "toc_depth": "toc_depth", "tocdepth": "toc_depth",
+    "toc_level": "toc_depth", "toc_levels": "toc_depth",
+    "profundidad_indice": "toc_depth", "profundidad_índice": "toc_depth",
+    "nivel_indice": "toc_depth", "nivel_índice": "toc_depth",
+    "profundidad_toc": "toc_depth",
     "page_size": "page_size", "pagesize": "page_size",
     "tamano": "page_size", "tamaño": "page_size",
     "tamano_pagina": "page_size", "tamaño_pagina": "page_size",
@@ -501,6 +534,7 @@ def parse_front_matter(text):
     primer encabezado `# ` (que se elimina del cuerpo para no duplicarlo)."""
     meta = {"title": "", "subtitle": "", "comment": "", "author": "",
             "logo": "", "lang": "es", "code_theme": "", "numbering": "true",
+            "toc_depth": "",
             "page_size": "", "orientation": "", "margins": "",
             "margin_top": "", "margin_right": "", "margin_bottom": "",
             "margin_left": "", "bibliography": "", "citation_style": ""}
@@ -562,10 +596,12 @@ def apply_section_numbering(body_md):
     que el número aparezca igual en el cuerpo, en el índice de contenidos y en los
     marcadores (outline) del PDF, sin que el autor lo escriba a mano.
 
-    Solo afecta a `##` y `###`; ignora los encabezados dentro de vallas de código.
-    Activada por defecto; desactívala con `numbering: false` en el front matter si
-    el documento ya trae la numeración escrita a mano (para no duplicarla)."""
-    h2 = h3 = 0
+    Numera `##` (1.), `###` (1.1), `####` (1.1.1) y `#####` (1.1.1.1), reiniciando
+    los contadores de nivel inferior al subir de sección. Ignora los encabezados
+    dentro de vallas de código. Activada por defecto; desactívala con
+    `numbering: false` en el front matter si el documento ya trae la numeración
+    escrita a mano (para no duplicarla)."""
+    h2 = h3 = h4 = h5 = 0
     in_fence = False
     out = []
     for line in body_md.split("\n"):
@@ -574,15 +610,72 @@ def apply_section_numbering(body_md):
             out.append(line)
             continue
         m = None if in_fence else _HEADING_RE.match(line)
-        if m and len(m.group(1)) == 2:
+        level = len(m.group(1)) if m else 0
+        if level == 2:
             h2 += 1
-            h3 = 0
+            h3 = h4 = h5 = 0
             out.append(f"## {h2}. {m.group(2)}")
-        elif m and len(m.group(1)) == 3:
+        elif level == 3:
             h3 += 1
+            h4 = h5 = 0
             out.append(f"### {h2}.{h3} {m.group(2)}")
+        elif level == 4:
+            h4 += 1
+            h5 = 0
+            out.append(f"#### {h2}.{h3}.{h4} {m.group(2)}")
+        elif level == 5:
+            h5 += 1
+            out.append(f"##### {h2}.{h3}.{h4}.{h5} {m.group(2)}")
         else:
             out.append(line)
+    return "\n".join(out)
+
+
+# Marcas individuales para el índice de contenidos: un comentario `<!-- toc -->`
+# (forzar la inclusión de un encabezado que excede la profundidad por defecto, p.
+# ej. un `#####`) o `<!-- no-toc -->` (excluir uno que sí entraría) en la línea
+# justo encima del encabezado. Se traducen a una clase `attr_list` en el propio
+# encabezado, que luego collect_toc_overrides localiza por su id.
+_TOC_MARK_RE = re.compile(r'^\s*<!--\s*(no-?toc|toc)\s*-->\s*$', re.IGNORECASE)
+
+
+def _add_heading_class(line, cls):
+    """Añade una clase `attr_list` a una línea de encabezado, fusionándola con un
+    bloque `{: ... }` ya existente si lo hubiera."""
+    m = re.search(r'\{:?\s*([^}]*)\}\s*$', line)
+    if m:
+        inner = m.group(1).strip()
+        return f"{line[:m.start()].rstrip()} {{: {inner} .{cls} }}"
+    return f"{line.rstrip()} {{: .{cls} }}"
+
+
+def apply_toc_markers(body_md):
+    """Traduce los comentarios `<!-- toc -->` / `<!-- no-toc -->` situados sobre un
+    encabezado en una clase (`toc-force` / `toc-skip`) sobre ese encabezado, y
+    elimina el comentario. Permite líneas en blanco entre la marca y el encabezado.
+    Ignora las marcas dentro de vallas de código."""
+    out = []
+    pending = None        # 'toc-force' | 'toc-skip' | None
+    in_fence = False
+    for line in body_md.split("\n"):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            pending = None
+            out.append(line)
+            continue
+        if not in_fence:
+            mark = _TOC_MARK_RE.match(line)
+            if mark:
+                pending = "toc-skip" if mark.group(1).lower().startswith("no") \
+                    else "toc-force"
+                continue                      # descarta el comentario
+            if _HEADING_RE.match(line):
+                if pending:
+                    line = _add_heading_class(line, pending)
+                pending = None
+            elif line.strip():
+                pending = None                # solo se permiten líneas en blanco
+        out.append(line)
     return "\n".join(out)
 
 
@@ -927,6 +1020,75 @@ def apply_keep_with_prev(html):
     return pattern.sub(lambda m: inject(m.group(1)), html)
 
 
+# ─────────────────────── Índice de contenidos ───────────────────────
+
+_TOC_HEADING_RE = re.compile(r'<h[2-6]\b([^>]*)>', re.IGNORECASE)
+
+
+def collect_toc_overrides(html):
+    """Recoge los id de los encabezados marcados individualmente para el índice:
+    `toc-force` (forzar su inclusión aunque excedan la profundidad por defecto) y
+    `toc-skip` (excluirlos aunque entren). Las clases las inyecta apply_toc_markers
+    a partir de los comentarios `<!-- toc -->` / `<!-- no-toc -->`."""
+    force, skip = set(), set()
+    for m in _TOC_HEADING_RE.finditer(html):
+        attrs = m.group(1)
+        id_m = re.search(r'\bid="([^"]+)"', attrs)
+        cls_m = re.search(r'\bclass="([^"]*)"', attrs)
+        if not id_m or not cls_m:
+            continue
+        classes = cls_m.group(1).split()
+        if "toc-force" in classes:
+            force.add(id_m.group(1))
+        if "toc-skip" in classes:
+            skip.add(id_m.group(1))
+    return force, skip
+
+
+def _toc_items(tokens, max_level, force_ids, skip_ids):
+    """Lista de `<li>` del índice a partir del árbol de encabezados. Un encabezado
+    entra si no está marcado `toc-skip` y, o bien su nivel no supera `max_level`, o
+    bien está marcado `toc-force`. Los descendientes forzados de un encabezado
+    excluido ascienden de nivel para no perderse."""
+    items = []
+    for tok in tokens:
+        children = _toc_items(tok.get("children", []), max_level, force_ids, skip_ids)
+        tid = tok.get("id", "")
+        shown = tid not in skip_ids and (tok["level"] <= max_level or tid in force_ids)
+        if shown:
+            sub = f'\n<ul>\n{"".join(children)}</ul>\n' if children else ""
+            link = f'<a href="#{tid}">{escape(tok.get("name", ""))}</a>'
+            items.append(f"<li>{link}{sub}</li>\n")
+        else:
+            items.extend(children)
+    return items
+
+
+def build_toc_html(toc_tokens, max_level, force_ids, skip_ids):
+    """Construye el HTML del índice de contenidos desde `md.toc_tokens`, incluyendo
+    por defecto hasta `max_level` (`toc_depth`) y respetando las marcas
+    individuales `<!-- toc -->` / `<!-- no-toc -->`."""
+    items = _toc_items(toc_tokens, max_level, force_ids, skip_ids)
+    return f'<div class="toc">\n<ul>\n{"".join(items)}</ul>\n</div>'
+
+
+def outline_css(depth):
+    """Reglas `bookmark-level` de los marcadores (outline) del PDF, generadas según
+    la profundidad del índice para que coincidan con él: los niveles `##`…`#depth#`
+    se marcan; los más profundos solo si se fuerzan con `<!-- toc -->`
+    (`toc-force`), y los marcados `<!-- no-toc -->` (`toc-skip`) se omiten."""
+    lines = []
+    for level in range(2, 7):
+        bl = level - 1
+        if level <= depth:
+            lines.append(f".body h{level} {{ bookmark-level: {bl}; }}")
+        else:
+            lines.append(f".body h{level} {{ bookmark-level: none; }}")
+            lines.append(f".body h{level}.toc-force {{ bookmark-level: {bl}; }}")
+    lines.append(".body .toc-skip { bookmark-level: none; }")
+    return "\n".join(lines)
+
+
 def _indices_html(figures, tables, code_blocks, strings):
     """Construye la sección de índices (figuras/tablas/código) no vacíos."""
     def _block(title, rows):
@@ -988,8 +1150,13 @@ def content_html(meta, body_md, strings, code_style, page_size,
                  bib_entries=None, citation_style="numeric"):
     """Índice + índices + cuerpo en un único HTML. Lanza ValueError si algún
     elemento carece de descripción (TODO #7)."""
+    # El TocExtension captura todos los niveles (2-6); la profundidad real del
+    # índice (toc_depth) y las marcas individuales se aplican después al construir
+    # el índice desde `md.toc_tokens`. `attr_list` permite inyectar las clases
+    # `toc-force` / `toc-skip` desde los comentarios `<!-- toc -->`.
     md = markdown.Markdown(
-        extensions=[TocExtension(toc_depth="2-3"), "tables", "fenced_code", "codehilite"],
+        extensions=[TocExtension(toc_depth="2-6"), "tables", "fenced_code",
+                    "codehilite", "attr_list"],
         extension_configs={"codehilite": {
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}"}},
@@ -1001,6 +1168,10 @@ def content_html(meta, body_md, strings, code_style, page_size,
             body_md, bib_entries, citation_style, meta.get("lang", "es"), strings)
         if refs_md:
             body_md = f"{body_md}\n\n{refs_md}"
+    # Marcas individuales del índice (`<!-- toc -->` / `<!-- no-toc -->`): se
+    # traducen a clases antes de numerar y convertir (funcionan con la numeración
+    # activada o no).
+    body_md = apply_toc_markers(body_md)
     # Numeración automática de secciones (activada por defecto): se aplica al
     # Markdown antes de convertir, para que el número quede reflejado en cuerpo,
     # índice y outline. Se desactiva con `numbering: false`.
@@ -1010,9 +1181,16 @@ def content_html(meta, body_md, strings, code_style, page_size,
     # conversión; el resto usa el tema general (code_style) vía codehilite.
     body_md, themed_blocks = extract_themed_blocks(body_md)
     body = md.convert(body_md)
-    toc_tree = md.toc
+    toc_tokens = md.toc_tokens
     for token, snippet in themed_blocks.items():
         body = body.replace(f"<p>{token}</p>", snippet).replace(token, snippet)
+
+    # Índice de contenidos: profundidad por defecto (toc_depth) + marcas
+    # individuales recogidas de las clases que apply_toc_markers dejó en los
+    # encabezados del cuerpo ya convertido.
+    toc_depth = resolve_toc_depth(meta)
+    force_ids, skip_ids = collect_toc_overrides(body)
+    toc_tree = build_toc_html(toc_tokens, toc_depth, force_ids, skip_ids)
 
     body, figures, tables, code_blocks, missing = add_asset_numbers(body, strings)
     if missing:
@@ -1028,7 +1206,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}</style>
+<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{outline_css(toc_depth)}</style>
 </head>
 <body>
 <div class="toc-page">
@@ -1065,9 +1243,11 @@ def merge_pdfs(cover_bytes, content_bytes, meta):
     return out.getvalue()
 
 
-def convert_one(md_path):
-    """Convierte un único .md a .pdf junto a él. Lanza excepción si algo falla."""
-    pdf_path = md_path.with_suffix(".pdf")
+def convert_one(md_path, out_path=None):
+    """Convierte un único .md a .pdf. Por defecto el PDF se escribe junto al .md
+    con el mismo nombre; con `out_path` se escribe en la ruta indicada (opción
+    `-o`). Lanza excepción si algo falla."""
+    pdf_path = out_path or md_path.with_suffix(".pdf")
     md_text = md_path.read_text(encoding="utf-8")
     meta, body_md = parse_front_matter(md_text)
     strings = get_strings(meta["lang"])
@@ -1090,14 +1270,15 @@ def convert_one(md_path):
     return len(pdf_bytes)
 
 
-def convert_and_report(md_path):
+def convert_and_report(md_path, out_path=None):
     """Convierte un .md informando con el formato estándar
-    (`nombre.md → nombre.pdf [OK, NN KB]` / `[ERROR: …]`). Devuelve True si fue
-    bien. Lo usan tanto la conversión única como el modo --watch."""
-    pdf_path = md_path.with_suffix(".pdf")
+    (`nombre.md → nombre.pdf [OK, NN KB]` / `[ERROR: …]`). Con `out_path` el PDF
+    se escribe en la ruta indicada (opción `-o`). Devuelve True si fue bien. Lo
+    usan tanto la conversión única como el modo --watch."""
+    pdf_path = out_path or md_path.with_suffix(".pdf")
     print(f"  {md_path.name} → {pdf_path.name}", end=" ", flush=True)
     try:
-        kb = convert_one(md_path) // 1024
+        kb = convert_one(md_path, out_path) // 1024
         print(f"[OK, {kb} KB]")
         return True
     except Exception as e:
@@ -1211,18 +1392,44 @@ def collect_md_files(args):
 
 def main():
     watch = False
+    output = None
     args = []
-    for arg in sys.argv[1:]:
+    rest = sys.argv[1:]
+    i = 0
+    while i < len(rest):
+        arg = rest[i]
         if arg in ("--watch", "-w"):
             watch = True
+        elif arg in ("--output", "-o"):
+            # Nombre/ruta del PDF de salida; el valor va en el siguiente argumento.
+            if i + 1 >= len(rest):
+                print("La opción -o/--output necesita un nombre de fichero.")
+                sys.exit(1)
+            output = rest[i + 1]
+            i += 1
+        elif arg.startswith("--output="):
+            output = arg[len("--output="):]
+        elif arg.startswith("-o="):
+            output = arg[len("-o="):]
         else:
             args.append(arg)
+        i += 1
 
     if not args:
-        print("Uso: md-to-pdf [--watch] <archivo.md | directorio> ...")
+        print("Uso: md-to-pdf [--watch] [-o salida.pdf] <archivo.md | directorio> ...")
         sys.exit(1)
 
     md_files, watch_dirs = collect_md_files(args)
+
+    # `-o` solo tiene sentido al convertir un único .md: con varios ficheros (o un
+    # directorio) no se puede dar un mismo nombre a todos. Se avisa y se ignora.
+    out_path = None
+    if output is not None:
+        if watch_dirs or len(md_files) != 1:
+            print("Aviso: -o/--output solo se aplica al convertir un único .md; "
+                  "se ignora y cada PDF se escribe junto a su .md.")
+        else:
+            out_path = Path(output)
 
     if watch:
         watch_files(md_files, watch_dirs)
@@ -1232,7 +1439,10 @@ def main():
         print("No hay archivos .md")
         sys.exit(1)
 
-    failures = sum(not convert_and_report(p) for p in md_files)
+    if out_path is not None:
+        failures = sum(not convert_and_report(p, out_path) for p in md_files)
+    else:
+        failures = sum(not convert_and_report(p) for p in md_files)
     if failures:
         sys.exit(1)
 

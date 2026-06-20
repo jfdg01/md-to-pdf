@@ -1,11 +1,12 @@
 ---
 title: Documento de prueba integral
 subtitle: Verificación del conversor
-comment: Curso 2025/2026
-author: Usuario de Prueba
+comment: Algo mas
+author: jfdg01
 locale: es
 bibliography: test_refs.bib
 citation_style: numeric
+logo: ./assets/img/logo_uja.webp
 ---
 
 ## Introducción

@@ -78,6 +78,24 @@ md-to-pdf .
 
 Cada PDF se escribe junto a su `.md` de origen, con el mismo nombre.
 
+### Nombre del PDF de salida (`-o` / `--output`)
+
+Por defecto el PDF se llama igual que el `.md` y se escribe junto a él. Para
+elegir otro nombre o ruta, usa `-o` (o `--output`). Funciona delante o detrás del
+fichero de entrada:
+
+```bash
+# Elige el nombre del PDF generado
+md-to-pdf informe.md -o memoria-final.pdf
+
+# El orden de los argumentos da igual; admite también una ruta
+md-to-pdf -o /tmp/salida.pdf informe.md
+```
+
+`-o` **solo se aplica al convertir un único `.md`**: si pasas varios ficheros o un
+directorio, no se puede dar un mismo nombre a todos, así que se avisa por consola
+y la opción se ignora (cada PDF se escribe junto a su `.md`).
+
 ### Modo vigilancia (`--watch`)
 
 Con `--watch`, el conversor se queda observando y **regenera el PDF cada vez que
@@ -139,6 +157,7 @@ en los encabezados.
 | `locale`   | `es` (def.) o `en`: idioma de "Figura/Figure", índices…  | Todo el documento |
 | `code_theme`| Paleta de resaltado de código (ver más abajo)           | Bloques de código |
 | `numbering`| Numera las secciones automáticamente (def. `true`; `false` lo desactiva) | Secciones + índice |
+| `toc_depth`| Nivel máximo en el índice: `3` (`###`), `4` (`####`, def.) o `5` (`#####`) | Índice + marcadores |
 | `page_size`| Tamaño de página: `a4` (def.), `a5`, `a3`, `letter`, `legal`… | Todo el documento |
 | `orientation`| `portrait` (def.) o `landscape`                         | Todo el documento |
 | `margins`  | Márgenes del cuerpo en CSS (`1.15in 0.85in 0.95in 0.85in`) | Todo el documento |
@@ -146,8 +165,8 @@ en los encabezados.
 | `citation_style`| `numeric` (def., `[1]`) o `author-year` (`(Pérez, 2020)`) | Marcas de cita |
 
 Se aceptan alias en español (`titulo`, `subtitulo`, `autor`, `imagen`, `idioma`,
-`numeracion`, `tamaño`, `orientacion`, `margenes`, `bibliografia`,
-`estilo_cita`…).
+`numeracion`, `profundidad_indice`, `tamaño`, `orientacion`, `margenes`,
+`bibliografia`, `estilo_cita`…).
 Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no defines
 `logo`, la portada no lleva imagen; con `logo: none` también lo desactivas
 explícitamente.
@@ -157,18 +176,46 @@ explícitamente.
 - **`## ` = sección.** Cada encabezado de nivel 2 empieza en una **página nueva**.
   Se numeran solas (`1.`, `2.`…); no escribas el número a mano (ver abajo).
 - **`### ` = subsección.** No fuerza salto de página.
-- **El índice** lista automáticamente los `##` y `###`, con enlaces que saltan a
-  la sección al hacer clic, y el PDF incluye **marcadores** con esa jerarquía.
+- **`#### ` y `##### ` = sub-subsección y nivel 5.** También se numeran solos
+  (`1.1.1`, `1.1.1.1`).
+- **El índice** lista automáticamente los `##`, `###` y `####` (hasta el nivel
+  `toc_depth`, def. `####`), con enlaces que saltan a la sección al hacer clic, y
+  el PDF incluye **marcadores** con esa jerarquía (ver «Profundidad del índice»).
 - Funciona el Markdown habitual: **negrita**, *cursiva*, listas, tablas, `código`
   en línea y bloques con triple acento grave, citas.
 
 ### Numeración automática de secciones
 
 Por defecto el conversor numera las secciones por ti: los `##` reciben `1.`,
-`2.`, `3.`… y los `###` su `1.1`, `1.2`… El número aparece igual en el cuerpo, en
-el índice de contenidos y en los marcadores del PDF, así que **no lo escribas a
-mano** en los encabezados. Si tu documento ya trae la numeración escrita,
-desactívala con `numbering: false` para no duplicarla.
+`2.`, `3.`…, los `###` su `1.1`, `1.2`…, los `####` su `1.1.1` y los `#####` su
+`1.1.1.1`. El número aparece igual en el cuerpo, en el índice de contenidos y en
+los marcadores del PDF, así que **no lo escribas a mano** en los encabezados. Si
+tu documento ya trae la numeración escrita, desactívala con `numbering: false`
+para no duplicarla.
+
+### Profundidad del índice
+
+El índice de contenidos (y los marcadores del PDF) llega por defecto hasta los
+`####` (nivel 4); los `#####` no aparecen. Cámbialo para **todo el documento** con
+`toc_depth` en el front matter:
+
+```yaml
+toc_depth: 5   # incluye también los #####  (3 = solo hasta ###)
+```
+
+Y para un encabezado **concreto**, pon un comentario en la línea de encima:
+
+```markdown
+<!-- toc -->
+##### Apartado que sí quiero en el índice
+
+<!-- no-toc -->
+### Apartado que NO quiero en el índice
+```
+
+`<!-- toc -->` fuerza la entrada de ese encabezado aunque su nivel exceda
+`toc_depth`; `<!-- no-toc -->` la excluye aunque su nivel sí entre. Ambas marcas
+afectan por igual al índice y a los marcadores del PDF.
 
 ### Referencias cruzadas
 
