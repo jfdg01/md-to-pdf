@@ -108,18 +108,21 @@ logo: imagenes/portada.png
 locale: es
 ---
 
-## 1. Introducción
+## Introducción
 
 Texto de la primera sección...
 
-### 1.1 Un subapartado
+### Un subapartado
 
 Más texto...
 
-## 2. Siguiente sección
+## Siguiente sección
 
 ...
 ```
+
+Las secciones se numeran solas (ver más abajo), así que **no escribas el número**
+en los encabezados.
 
 ### Metadatos del front matter
 
@@ -132,7 +135,7 @@ Más texto...
 | `logo`     | Ruta a **cualquier** imagen para la portada              | Portada           |
 | `locale`   | `es` (def.) o `en`: idioma de "Figura/Figure", índices…  | Todo el documento |
 | `code_theme`| Paleta de resaltado de código (ver más abajo)           | Bloques de código |
-| `numbering`| `true` numera solo las secciones automáticamente (def. `false`) | Secciones + índice |
+| `numbering`| Numera las secciones automáticamente (def. `true`; `false` lo desactiva) | Secciones + índice |
 | `page_size`| Tamaño de página: `a4` (def.), `a5`, `a3`, `letter`, `legal`… | Todo el documento |
 | `orientation`| `portrait` (def.) o `landscape`                         | Todo el documento |
 | `margins`  | Márgenes del cuerpo en CSS (`1.15in 0.85in 0.95in 0.85in`) | Todo el documento |
@@ -146,7 +149,7 @@ Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no define
 ### Reglas del cuerpo
 
 - **`## ` = sección.** Cada encabezado de nivel 2 empieza en una **página nueva**.
-  Numéralas `## 1. ...`, `## 2. ...` a mano, o activa `numbering: true` (abajo).
+  Se numeran solas (`1.`, `2.`…); no escribas el número a mano (ver abajo).
 - **`### ` = subsección.** No fuerza salto de página.
 - **El índice** lista automáticamente los `##` y `###`, con enlaces que saltan a
   la sección al hacer clic, y el PDF incluye **marcadores** con esa jerarquía.
@@ -155,11 +158,11 @@ Si no defines `title`, se usa el primer encabezado `# ` del cuerpo. Si no define
 
 ### Numeración automática de secciones
 
-Con `numbering: true` en el front matter, el conversor numera las secciones por
-ti: los `##` reciben `1.`, `2.`, `3.`… y los `###` su `1.1`, `1.2`… El número
-aparece igual en el cuerpo, en el índice de contenidos y en los marcadores del
-PDF, así que **no lo escribas a mano** en los encabezados (def. `false`, para no
-duplicar la numeración de los documentos que ya la traen escrita).
+Por defecto el conversor numera las secciones por ti: los `##` reciben `1.`,
+`2.`, `3.`… y los `###` su `1.1`, `1.2`… El número aparece igual en el cuerpo, en
+el índice de contenidos y en los marcadores del PDF, así que **no lo escribas a
+mano** en los encabezados. Si tu documento ya trae la numeración escrita,
+desactívala con `numbering: false` para no duplicarla.
 
 ### Referencias cruzadas
 

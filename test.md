@@ -6,13 +6,13 @@ author: Usuario de Prueba
 locale: es
 ---
 
-## 1. Introducción
+## Introducción
 
 Este documento cubre todos los elementos que el conversor puede generar.
 Sirve como herramienta de verificación visual: cada sección comprueba
 un aspecto distinto del PDF resultante.
 
-### 1.1 Propósito
+### Propósito
 
 El objetivo es confirmar que portada, índice, cabecera, pie, fuentes,
 saltos de página y numeración automática de figuras y tablas funcionan
@@ -26,7 +26,7 @@ Y la segunda imagen de esta sección:
 
 ![Vista aérea de bosque](foto2.jpg)
 
-### 1.2 Primera tabla de la sección
+### Primera tabla de la sección
 
 <!-- caption: Checklist de elementos verificables del PDF -->
 | Elemento        | Estado esperado          | Notas                        |
@@ -37,11 +37,11 @@ Y la segunda imagen de esta sección:
 | Figuras         | Figura x.y bajo la imagen| Contador por sección         |
 | Tablas          | Tabla x.y encima         | Contador por sección         |
 
-## 2. Formato de texto
+## Formato de texto
 
 El cuerpo admite el Markdown habitual.
 
-### 2.1 Énfasis
+### Énfasis
 
 - **Negrita** con doble asterisco.
 - *Cursiva* con un asterisco.
@@ -49,7 +49,7 @@ El cuerpo admite el Markdown habitual.
 - ~~Tachado~~ (no soportado por el conversor, se muestra en bruto).
 - `código en línea` con acento grave.
 
-### 2.2 Párrafos y flujo
+### Párrafos y flujo
 
 Un párrafo normal tiene una separación cómoda con el siguiente.
 Este texto es suficientemente largo para comprobar que el interlineado
@@ -57,15 +57,15 @@ de 1,6 y el tamaño de 13 pt resultan legibles en el PDF impreso.
 
 Segundo párrafo de la misma subsección, sin ninguna marca especial.
 
-### 2.3 Hipervínculos
+### Hipervínculos
 
 Un enlace externo: [Página de inicio de Python](https://www.python.org).
 Los hipervínculos del índice y del outline del PDF son internos y se
 generan automáticamente; no es necesario escribirlos a mano.
 
-## 3. Listas
+## Listas
 
-### 3.1 Lista no ordenada con guiones
+### Lista no ordenada con guiones
 
 - Primer elemento de nivel 1
 - Segundo elemento de nivel 1
@@ -74,7 +74,7 @@ generan automáticamente; no es necesario escribirlos a mano.
     - Tercer nivel de anidamiento
 - Tercer elemento de nivel 1
 
-### 3.2 Lista ordenada
+### Lista ordenada
 
 1. Paso uno
 2. Paso dos
@@ -83,7 +83,7 @@ generan automáticamente; no es necesario escribirlos a mano.
    2. Subpaso 3.2
 4. Paso cuatro
 
-### 3.3 Lista con texto largo
+### Lista con texto largo
 
 - Este ítem tiene un texto deliberadamente largo para comprobar que el ajuste
   de línea funciona correctamente dentro del elemento de lista sin romper
@@ -91,9 +91,9 @@ generan automáticamente; no es necesario escribirlos a mano.
 - Ítem corto.
 - Otro ítem con **negrita** y `código` en línea mezclados con texto normal.
 
-## 4. Bloques de código
+## Bloques de código
 
-### 4.1 Código sin lenguaje
+### Código sin lenguaje
 
 <!-- caption: Ejemplo de uso en línea de comandos -->
 ```
@@ -101,7 +101,7 @@ $ md-to-pdf informe.md
   informe.md → informe.pdf [OK, 142 KB]
 ```
 
-### 4.2 Python con resaltado de sintaxis
+### Python con resaltado de sintaxis
 
 <!-- caption: Función de numeración de figuras y tablas -->
 ```python
@@ -127,7 +127,7 @@ def add_figure_table_numbers(html):
     return pattern.sub(sub, html)
 ```
 
-### 4.3 Bash con tema propio (solarized-light)
+### Bash con tema propio (solarized-light)
 
 Este bloque lleva `<!-- code-theme: solarized-light -->` en la línea anterior a
 la valla, de modo que usa esa paleta en lugar del tema oscuro por defecto del documento.
@@ -141,7 +141,7 @@ bash install.sh
 md-to-pdf documento.md
 ```
 
-### 4.4 JSON con tema propio (monokai)
+### JSON con tema propio (monokai)
 
 Y este otro usa `<!-- code-theme: monokai -->`: un tema oscuro. Compáralo con el
 bloque anterior y con los bloques oscuros por defecto para ver tres paletas
@@ -162,7 +162,7 @@ distintas conviviendo en el mismo documento.
 }
 ```
 
-### 4.5 Bloque de código largo (más de dos páginas)
+### Bloque de código largo (más de dos páginas)
 
 El siguiente bloque verifica que el conversor maneja correctamente bloques
 de código que superan el límite de una página. Además lleva `<!-- keep -->`,
@@ -366,7 +366,7 @@ class CsvAnalyser:
         return f"CsvAnalyser({self.path.name!r}, {status})"
 ```
 
-### 4.6 Bloque mantenido junto al texto previo
+### Bloque mantenido junto al texto previo
 
 El marcador `<!-- keep -->` (en la línea anterior al elemento) fuerza a este a
 permanecer en la misma página que el contenido precedente, en lugar de empujarlo
@@ -381,9 +381,9 @@ def keep_example():
     return "permanece junto al párrafo previo"
 ```
 
-## 5. Tablas
+## Tablas
 
-### 5.1 Tabla básica
+### Tabla básica
 
 <!-- caption: Parámetros de configuración del conversor -->
 | Nombre   | Tipo     | Valor por defecto |
@@ -392,7 +392,7 @@ def keep_example():
 | `font`   | `string` | `Source Serif 4`  |
 | `size`   | `int`    | `13`              |
 
-### 5.2 Tabla con alineación
+### Tabla con alineación
 
 <!-- caption: Demostración de alineación de columnas -->
 | Izquierda    | Centro       | Derecha    |
@@ -401,15 +401,15 @@ def keep_example():
 | texto largo  | texto largo  | 99,00 €    |
 | A            | B            | 0,01 €     |
 
-## 6. Imágenes
+## Imágenes
 
-### 6.1 Primera imagen de la sección
+### Primera imagen de la sección
 
 Esta imagen recibe la etiqueta **Figura 6.1**:
 
 ![Perro de raza husky en la nieve](foto3.jpg)
 
-### 6.2 Segunda imagen de la sección
+### Segunda imagen de la sección
 
 Esta imagen recibe la etiqueta **Figura 6.2**:
 
@@ -418,9 +418,9 @@ Esta imagen recibe la etiqueta **Figura 6.2**:
 El contador se reinicia en la siguiente sección (`##`), por lo que
 la primera imagen de la sección 7 será *Figura 7.1*.
 
-## 7. Citas, separadores y elementos mixtos
+## Citas, separadores y elementos mixtos
 
-### 7.1 Cita en bloque
+### Cita en bloque
 
 > Esta es una cita en bloque (*blockquote*). Puede contener **texto con
 > formato**, `código` e incluso varias líneas consecutivas que se unen
@@ -428,7 +428,7 @@ la primera imagen de la sección 7 será *Figura 7.1*.
 
 > Segunda cita independiente, separada de la anterior.
 
-### 7.2 Separador horizontal
+### Separador horizontal
 
 El siguiente elemento es una línea horizontal (`---` en el Markdown):
 
@@ -438,7 +438,7 @@ El texto continúa tras el separador. Observa que el conversor ignora
 el `---` inicial del documento (lo usa como separador portada/cuerpo),
 pero dentro del cuerpo produce el `<hr>` habitual.
 
-### 7.3 Tabla e imagen en la misma sección
+### Tabla e imagen en la misma sección
 
 Esta sección tiene los dos tipos para verificar que los contadores
 son independientes:

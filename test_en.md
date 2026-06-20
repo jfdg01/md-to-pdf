@@ -7,7 +7,7 @@ logo: foto1.jpg
 locale: en
 ---
 
-## 1. Introduction
+## Introduction
 
 This short document verifies the **English locale** and a few features at once:
 asset labels should read "Figure", "Table" and "Code block", and the automatic
@@ -24,7 +24,7 @@ index titles should be in English. It also uses an arbitrary cover image via the
 | `font`   | `string` | `Source Serif 4` |
 | `size`   | `int`    | `14`             |
 
-### 1.1 Code block kept with its text
+### Code block kept with its text
 
 The `<!-- keep -->` marker forces the block below to stay on the same page as
 this paragraph:
@@ -36,7 +36,7 @@ def greet(name):
     return f"Hello, {name}!"
 ```
 
-## 2. Second section
+## Second section
 
 Figure and table counters reset on each section, so the first figure here is
 labelled **Figure 2.1**.

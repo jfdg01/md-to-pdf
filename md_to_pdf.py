@@ -480,7 +480,7 @@ def parse_front_matter(text):
     Si no hay front matter, el cuerpo es el texto entero y el título se toma del
     primer encabezado `# ` (que se elimina del cuerpo para no duplicarlo)."""
     meta = {"title": "", "subtitle": "", "comment": "", "author": "",
-            "logo": "", "lang": "es", "code_theme": "", "numbering": "",
+            "logo": "", "lang": "es", "code_theme": "", "numbering": "true",
             "page_size": "", "orientation": "", "margins": "",
             "margin_top": "", "margin_right": "", "margin_bottom": "",
             "margin_left": ""}
@@ -548,8 +548,8 @@ def apply_section_numbering(body_md):
     marcadores (outline) del PDF, sin que el autor lo escriba a mano.
 
     Solo afecta a `##` y `###`; ignora los encabezados dentro de vallas de código.
-    Se activa con `numbering: true` en el front matter (def. desactivado para no
-    romper documentos que ya traen la numeración escrita a mano)."""
+    Activada por defecto; desactívala con `numbering: false` en el front matter si
+    el documento ya trae la numeración escrita a mano (para no duplicarla)."""
     h2 = h3 = 0
     in_fence = False
     out = []
@@ -768,8 +768,9 @@ def content_html(meta, body_md, strings, code_style, page_size):
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}"}},
     )
-    # Numeración automática de secciones (opcional): se aplica al Markdown antes
-    # de convertir, para que el número quede reflejado en cuerpo, índice y outline.
+    # Numeración automática de secciones (activada por defecto): se aplica al
+    # Markdown antes de convertir, para que el número quede reflejado en cuerpo,
+    # índice y outline. Se desactiva con `numbering: false`.
     if _truthy(meta.get("numbering")):
         body_md = apply_section_numbering(body_md)
     # Los bloques con tema propio se resaltan aparte y se reinyectan tras la
