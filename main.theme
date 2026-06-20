@@ -66,9 +66,9 @@ citation_style: numeric
 # ── Font sizes ──
 # A bare number means points (14 -> 14pt); any CSS unit also works (1.2em, 12px).
 # body text
-text_size: 14
+text_size: 12
 # cover title
-title_size: 27
+title_size: 25
 # body headings, per level
 h1_size: 24.5
 h2_size: 18.5
@@ -78,20 +78,10 @@ h5_size: 12.5
 # h6 has no built-in size; uncomment to set one
 # h6_size: 12
 # code blocks and inline code
-code_size: 11.5
+code_size: 11
 # tables
-table_size: 13
+table_size: 11
 # running header (title · subtitle)
 header_size: 9.5
 # running footer (author) and page number
-footer_size: 9.5
-
-# ── Table-of-contents line sizes ──
-# toc_size sets every level at once; toc1_size…toc4_size override one level
-# (1 = top-level ## entries, 2 = ###, 3 = ####, 4 = #####). A per-level key wins
-# over toc_size; deeper levels inherit level 4.
-# toc_size: 11
-toc1_size: 12
-toc2_size: 11
-toc3_size: 10.5
-toc4_size: 10
+footer_size: 10

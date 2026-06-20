@@ -286,8 +286,15 @@ To customize the default palette, edit the `CODE_PALETTE` dict near the top of
 ### Font sizes
 
 Per-section font sizes can be set in the front matter: `text_size`,
-`title_size`, `h1_size`…`h6_size`, `code_size`, `table_size`. A bare number is
-points (`14` → `14pt`); any CSS unit (`1.2em`, `12px`) is kept as-is.
+`title_size`, `h1_size`…`h6_size`, `code_size`, `table_size`, `header_size`,
+`footer_size`. A bare number is points (`14` → `14pt`); any CSS unit (`1.2em`,
+`12px`) is kept as-is.
+
+The **table-of-contents** lines have their own sizes, per nesting level:
+`toc_size` sets every level at once, while `toc1_size`…`toc4_size` override an
+individual level (`1` = top-level `##` entries, `2` = `###`, `3` = `####`,
+`4` = `#####`; deeper levels inherit level 4). A per-level key wins over the
+general `toc_size`. Defaults are `12pt`/`11pt`/`10.5pt`/`10pt`.
 
 ---
 

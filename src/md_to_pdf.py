@@ -293,8 +293,8 @@ html, body {
 .toc-page .toc { margin: 0; padding: 0; }
 .toc-page .toc ul { list-style: none; margin: 0; padding: 0; }
 .toc-page .toc li { padding: 5px 0; }
-.toc-page .toc li li { padding-left: 2em; font-size: 13.5pt; font-weight: normal; }
-.toc-page .toc > ul > li { font-size: 14.5pt; font-weight: bold; }
+.toc-page .toc li li { padding-left: 2em; font-weight: normal; }
+.toc-page .toc > ul > li { font-weight: bold; }
 .toc-page .toc a { text-decoration: none; color: #1a1a1a; }
 
 /* ── Lists of figures/tables/code ── */
@@ -440,6 +440,38 @@ def font_size_css(meta):
         size = _font_size(meta.get(key))
         if size:
             rules.append(f"{selector} {{ font-size: {size}; }}")
+    return "\n".join(rules)
+
+
+# ─────────────────────── Table-of-contents line sizes ───────────────────────
+# The TOC lines are sized per nesting level (1 = top-level `##` sections, 2 =
+# `###`, 3 = `####`, 4 = `#####`). Each deeper selector is more specific than the
+# one above, so a level's size overrides whatever it would inherit from its
+# parent. Levels beyond 4 inherit the level-4 size. These sizes are no longer in
+# BASE_CSS; toc_size_css() always emits them so it fully controls TOC sizing.
+TOC_LEVEL_SELECTORS = {
+    1: ".toc-page .toc > ul > li",
+    2: ".toc-page .toc > ul > li > ul > li",
+    3: ".toc-page .toc > ul > li > ul > li > ul > li",
+    4: ".toc-page .toc > ul > li > ul > li > ul > li > ul > li",
+}
+
+# Default TOC line size per level (smaller and gently decreasing with depth).
+TOC_DEFAULT_SIZES = {1: "12pt", 2: "11pt", 3: "10.5pt", 4: "10pt"}
+
+
+def toc_size_css(meta):
+    """CSS font-size rules for the table-of-contents lines, per nesting level.
+    `toc_size` sets every level at once; `toc1_size`…`toc4_size` override an
+    individual level (1 = top-level `##` sections, 2 = `###`, 3 = `####`,
+    4 = `#####`). Each level falls back to the general `toc_size`, then to the
+    built-in default in TOC_DEFAULT_SIZES."""
+    general = _font_size(meta.get("toc_size"))
+    rules = []
+    for level, selector in TOC_LEVEL_SELECTORS.items():
+        size = (_font_size(meta.get(f"toc{level}_size")) or general
+                or TOC_DEFAULT_SIZES[level])
+        rules.append(f"{selector} {{ font-size: {size}; }}")
     return "\n".join(rules)
 
 
@@ -600,6 +632,15 @@ _META_ALIASES = {
     "footer_size": "footer_size", "tamano_pie": "footer_size",
     "tamaño_pie": "footer_size", "tamano_footer": "footer_size",
     "tamaño_footer": "footer_size",
+    # Table-of-contents line sizes: general + per nesting level.
+    "toc_size": "toc_size", "toc_line_size": "toc_size",
+    "tamano_indice": "toc_size", "tamaño_indice": "toc_size",
+    "tamaño_índice": "toc_size", "tamano_toc": "toc_size",
+    "tamaño_toc": "toc_size",
+    "toc1_size": "toc1_size", "toc_l1_size": "toc1_size",
+    "toc2_size": "toc2_size", "toc_l2_size": "toc2_size",
+    "toc3_size": "toc3_size", "toc_l3_size": "toc3_size",
+    "toc4_size": "toc4_size", "toc_l4_size": "toc4_size",
 }
 
 
@@ -619,6 +660,8 @@ DEFAULT_META = {
     "h5_size": "", "h6_size": "",
     "code_size": "", "table_size": "",
     "header_size": "", "footer_size": "",
+    "toc_size": "", "toc1_size": "", "toc2_size": "", "toc3_size": "",
+    "toc4_size": "",
 }
 
 
@@ -1335,7 +1378,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{outline_css(toc_depth)}</style>
+<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{outline_css(toc_depth)}</style>
 </head>
 <body>
 <div class="toc-page">
