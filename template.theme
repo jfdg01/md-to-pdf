@@ -1,0 +1,87 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# md-to-pdf theme template
+#
+# Copy this file, edit the values, then point a document at it from its front
+# matter:
+#
+#     ---
+#     title: My report
+#     theme: template.theme
+#     ---
+#
+# Every key is optional. Precedence is: built-in defaults < .theme < the
+# document's own front matter — so anything a document sets in its front matter
+# overrides what the theme sets here. The values below are the built-in defaults,
+# so this template renders identically to using no theme at all; change a value
+# to override that default for every document using this theme.
+#
+# Notes:
+#   - Lines starting with `#` are comments. Inline comments AFTER a value are
+#     NOT supported — keep each `key: value` on its own clean line.
+#   - Spanish aliases work for every key (see the README).
+#   - The `---` delimiters are optional in a .theme file.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Identity (normally set per-document, not in a shared theme) ──────────────
+# Uncomment only if every document using this theme should share these.
+# title: Document title
+# subtitle: An optional subtitle
+# comment: Free extra line (date, course, note…)
+# author: Your Name
+# logo: images/cover.png          (any image path, or `none`)
+# bibliography: refs.bib          (path to a BibTeX .bib file)
+
+# ── Language ──
+# es (default) | en
+locale: es
+
+# ── Sections and table of contents ──
+# auto-number sections: true (default) | false
+numbering: true
+# deepest TOC level: 3 (###) | 4 (####, default) | 5
+toc_depth: 4
+
+# ── Page geometry ──
+# a4 (default), a5, a3, letter, legal, b5, ledger…
+page_size: a4
+# portrait (default) | landscape
+orientation: portrait
+# body margins, CSS order: top right bottom left
+margins: 1.15in 0.85in 0.95in 0.85in
+# Or override individual sides instead of `margins`:
+# margin_top: 1.15in
+# margin_right: 0.85in
+# margin_bottom: 0.95in
+# margin_left: 0.85in
+
+# ── Code highlighting ──
+# custom (default) or any Pygments theme:
+# monokai, dracula, nord, gruvbox-dark, solarized-light, github-dark, friendly…
+code_theme: custom
+
+# ── Citations ──
+# numeric (default, [1]) | author-year ((Smith, 2020))
+citation_style: numeric
+
+# ── Font sizes ──
+# A bare number means points (14 -> 14pt); any CSS unit also works (1.2em, 12px).
+# body text
+text_size: 14
+# cover title
+title_size: 27
+# body headings, per level
+h1_size: 24.5
+h2_size: 18.5
+h3_size: 15
+h4_size: 13.5
+h5_size: 12.5
+# h6 has no built-in size; uncomment to set one
+# h6_size: 12
+# code blocks and inline code
+code_size: 11.5
+# tables
+table_size: 13
+# running header (title · subtitle)
+header_size: 9.5
+# running footer (author) and page number
+footer_size: 9.5

@@ -119,6 +119,7 @@ If `title` is omitted, the first `# ` heading in the body is used.
 | `bibliography`   | Path to a `.bib` (BibTeX) file for citations                  | "References" section|
 | `citation_style` | `numeric` (default, `[1]`) or `author-year` (`(Smith, 2020)`) | Citation markers    |
 | `*_size`         | Per-section font sizes (see Font sizes)                        | The matching part   |
+| `theme`          | Path to a `.theme` file of shared defaults (see Theme files)   | Whole document      |
 
 Spanish aliases are accepted (`titulo`, `autor`, `imagen`, `idioma`,
 `numeracion`, `tamaño`, `orientacion`, `margenes`, `bibliografia`,
@@ -230,6 +231,30 @@ margins: 1in 1.25in
 
 These apply to cover, indexes, and body alike. Unknown values are reported and
 fall back to the default.
+
+### Theme files
+
+To share a set of defaults across many documents, put them in a `.theme` file
+(same `key: value` format as the front matter) and point at it with `theme:`:
+
+```markdown
+---
+title: My report
+theme: house-style.theme   # path relative to the .md
+---
+```
+
+Precedence is **built-in defaults < `.theme` < the document's front matter**, so
+any key the document sets itself overrides the theme. A `.theme` can hold any
+front-matter key (page size, margins, `code_theme`, citation style, font sizes,
+even `author`), but not `theme` itself (themes don't chain). Comments use `#` on
+their own line — an inline comment *after* a value is treated as part of the
+value, so keep each `key: value` on a clean line. The optional `---` delimiters
+are allowed, so a front matter can be reused as a theme.
+
+Copy [`template.theme`](template.theme) to get started: it lists every key set
+to its built-in default, so it renders identically to no theme until you change
+a value.
 
 ### Syntax highlighting
 
