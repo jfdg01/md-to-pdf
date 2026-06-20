@@ -1333,8 +1333,13 @@ def content_html(meta, body_md, strings, code_style, page_size,
     # `md.toc_tokens`. `attr_list` lets us inject the `toc-force` / `toc-skip`
     # classes from the `<!-- toc -->` comments.
     md = markdown.Markdown(
+        # tab_length=2 lets nested lists use the common 2-space indentation
+        # (Python-Markdown defaults to 4); sane_lists keeps an ordered list
+        # that follows an unordered one as a separate <ol> instead of merging
+        # them into one <ul> (which rendered the numbers as bullets).
+        tab_length=2,
         extensions=[TocExtension(toc_depth="2-6"), "tables", "fenced_code",
-                    "codehilite", "attr_list"],
+                    "codehilite", "attr_list", "sane_lists"],
         extension_configs={"codehilite": {
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}"}},
