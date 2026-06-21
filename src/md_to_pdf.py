@@ -43,9 +43,7 @@ ROOT_DIR = SCRIPT_DIR.parent            # repo root (src/ hangs off this)
 ASSETS_DIR = ROOT_DIR / "assets"        # bundled fonts and images
 FONTS_DIR = ASSETS_DIR / "fonts"
 
-# Default body size and margins (both configurable from the front matter).
-# DEFAULT_MARGINS is per side: top right bottom left.
-PAGE_MARGIN = "1.15in 0.85in 0.95in 0.85in"
+# Default body margins, per side: top right bottom left.
 DEFAULT_MARGINS = ("1.15in", "0.85in", "0.95in", "0.85in")
 
 # Supported page sizes (normalized key -> WeasyPrint CSS keyword).
@@ -1660,10 +1658,7 @@ def main():
         print("No .md files")
         sys.exit(1)
 
-    if out_path is not None:
-        failures = sum(not convert_and_report(p, out_path) for p in md_files)
-    else:
-        failures = sum(not convert_and_report(p) for p in md_files)
+    failures = sum(not convert_and_report(p, out_path) for p in md_files)
     if failures:
         sys.exit(1)
 
