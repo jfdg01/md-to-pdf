@@ -12,6 +12,7 @@ Requires: weasyprint, python-markdown, pypdf (all pip, no Chrome).
 """
 import base64
 import io
+import logging
 import mimetypes
 import re
 import sys
@@ -32,6 +33,12 @@ from pygments.token import (Comment, Error, Generic, Keyword, Literal, Name,
 from pygments.util import ClassNotFound
 import pypdf
 import weasyprint
+
+# pypdf avisa «Annotation sizes differ: N vs. 0» al fusionar la portada con el
+# cuerpo: clona cada página excluyendo /Annots y compara los enlaces antes de
+# volver a insertarlos, así que el aviso es espurio (los enlaces internos y el
+# índice del PDF salen intactos). Solo errores reales.
+logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 for _stream in (sys.stdout, sys.stderr):
     try:
