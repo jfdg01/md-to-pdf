@@ -215,6 +215,23 @@ cited entries; it is a normal numbered section and appears in the TOC and
 bookmarks. Order is by appearance (numeric) or alphabetical by author
 (author-year). Missing keys are reported and left visible.
 
+An entry's **link is written out in full** and made clickable, so the
+bibliography stays usable on paper. It is taken from `url`, from a `\url{...}`
+inside `howpublished`, or from `doi` (resolved via doi.org). Add `urldate` (or
+`accessed`) and it is printed alongside as "accedido el …" / "accessed …",
+verbatim — write the date in the `.bib` in whatever form the document should
+show:
+
+```bibtex
+@misc{nvidia2024orinpower,
+  title        = {Platform Power and Performance},
+  author       = {{NVIDIA}},
+  howpublished = {\url{https://docs.nvidia.com/jetson/...}},
+  year         = {2024},
+  urldate      = {27 de julio de 2026}
+}
+```
+
 ### Page size and margins
 
 Defaults to **A4 portrait**. Override with `page_size`, `orientation`, and

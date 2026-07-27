@@ -66,6 +66,7 @@ STRINGS = {
         "code_block":  "Bloque de código",
         "references":  "Referencias",
         "no_date":     "s.f.",
+        "accessed":    "accedido el",
         "by":          "Realizado por",
     },
     "en": {
@@ -78,6 +79,7 @@ STRINGS = {
         "code_block":  "Code block",
         "references":  "References",
         "no_date":     "n.d.",
+        "accessed":    "accessed",
         "by":          "By",
     },
 }
@@ -371,6 +373,9 @@ a.cite { text-decoration: none; }
     padding-left: 1.6em;
     text-indent: -1.6em;   /* hanging indent: the first line sticks out */
 }
+/* A full URL is one long unbreakable token: without this it overflows the
+   column instead of wrapping. */
+.ref-url { overflow-wrap: anywhere; }
 
 /* ── Keep with the previous element ──
    Prevents a page break *before* the element and lets the element itself split
@@ -1051,8 +1056,39 @@ def _authors_short(entry, lang):
     return f"{lasts[0]} et al."
 
 
+# A URL written as a bare `url` field, or wrapped in `\url{}` inside
+# `howpublished` (the usual way to put a link on a @misc entry).
+_BIB_URL_RE = re.compile(r'\\url\s*\{([^}]*)\}')
+
+
+def _entry_url(entry):
+    """The entry's link: `url` if present, otherwise the `\\url{...}` inside
+    `howpublished` (or `howpublished` itself when it is already a bare URL),
+    otherwise a `doi` resolved through doi.org. Empty string if there is none."""
+    fields = entry.fields
+    url = _clean(fields.get("url", ""))
+    if not url:
+        # Read `howpublished` raw: `_clean` strips the braces, which would eat
+        # the `\url{...}` delimiters this needs to match.
+        howpub = str(fields.get("howpublished", "")).strip()
+        m = _BIB_URL_RE.search(howpub)
+        url = m.group(1).strip() if m else (
+            howpub if howpub.startswith(("http://", "https://")) else "")
+    if not url:
+        doi = _clean(fields.get("doi", ""))
+        if doi:
+            url = f"https://doi.org/{doi}"
+    return url
+
+
 def _format_reference(entry, lang, strings):
-    """Entry formatted consistently: "Authors (year). *Title*. Container."."""
+    """Entry formatted consistently:
+    "Authors (year). *Title*. Container. <link> (accessed on <date>)."
+
+    The link is written out in full and made clickable, because a printed
+    bibliography has to be usable on paper. The access date comes from
+    `urldate` (biblatex) or `accessed`, and is printed verbatim — write it in
+    the `.bib` in whatever form the document should show."""
     fields = entry.fields
     title = _clean(fields.get("title", ""))
     container = _clean(fields.get("journal") or fields.get("booktitle")
@@ -1065,6 +1101,12 @@ def _format_reference(entry, lang, strings):
         parts.append(f"*{title}*.")
     if container:
         parts.append(f"{container}.")
+    url = _entry_url(entry)
+    if url:
+        accessed = _clean(fields.get("urldate") or fields.get("accessed") or "")
+        link = f'<a class="ref-url" href="{escape(url)}">{escape(url)}</a>'
+        parts.append(f'{link} ({strings["accessed"]} {escape(accessed)}).'
+                     if accessed else f"{link}")
     return " ".join(parts)
 
 
