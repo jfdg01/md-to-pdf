@@ -308,9 +308,10 @@ html, body {
 a { color: #5a8fc4; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', Arial, sans-serif; }
 h1 { font-size: 19pt; margin-bottom: 16px; }
-/* Each ## section starts on a new page. The forced break after the TOC and this
-   one merge, so no blank page appears. */
-.body h2 { break-before: page; }
+/* Each top-level section starts on a new page. Which level that is depends on
+   the document (see detect_base_level), so the rule is emitted by
+   heading_css(); the forced break after the TOC and this one merge, so no blank
+   page appears. */
 h2 { font-size: 16pt; margin-top: 28px; }
 h3 { font-size: 13.5pt; margin-top: 20px; color: #222; }
 h4 { font-size: 12pt; margin-top: 18px; color: #333; }
@@ -525,18 +526,19 @@ DEFAULT_TOC_DEPTH = 4
 
 def resolve_toc_depth(meta):
     """Resolve `toc_depth`: the deepest heading level that enters the table of
-    contents (3 = down to `###`, 4 = down to `####`, 5 = down to `#####`).
-    Default 4. Accepts '3'/'4'/'5', 'h4', '####'… Warn and fall back to the
-    default if the value is unknown (same as with `code_theme`)."""
+    contents, as an absolute heading level (2 = down to `##`, 3 = down to `###`,
+    4 = down to `####`). Default 4. Accepts '3'/'4'/'5', 'h4', '####'… Warn and
+    fall back to the default if the value is unknown (same as with
+    `code_theme`)."""
     raw = (meta.get("toc_depth") or "").strip().lower()
     if not raw:
         return DEFAULT_TOC_DEPTH
-    if raw.count("#") >= 2:
+    if raw.count("#") >= 1:
         depth = raw.count("#")
     else:
-        m = re.search(r"[2-6]", raw)
+        m = re.search(r"[1-6]", raw)
         depth = int(m.group(0)) if m else 0
-    if 2 <= depth <= 6:
+    if 1 <= depth <= 6:
         return depth
     print(f"    (warning: invalid TOC depth '{raw}'; using "
           f"{DEFAULT_TOC_DEPTH})", file=sys.stderr)
@@ -798,22 +800,52 @@ def find_logo(md_path, meta):
 
 # ─────────────────────── Section numbering and cross-references ───────────────────────
 
-_HEADING_RE = re.compile(r'^(#{2,6})\s+(.*)$')
+_HEADING_RE = re.compile(r'^(#{1,6})\s+(.*)$')
 _FENCE_RE = re.compile(r'^\s*(```|~~~)')
 
+# How many levels below the top one get a number (top + 3 = `1`, `1.1`, `1.1.1`,
+# `1.1.1.1`). Deeper headings are left unnumbered.
+NUMBERED_LEVELS = 4
 
-def apply_section_numbering(body_md):
-    """Auto-number section headings (`##` -> 1, 2, 3…) and subsection headings
-    (`###` -> 1.1, 1.2…) in the Markdown before converting it, so the number
-    appears the same in the body, the table of contents, and the PDF bookmarks
-    (outline), without the author writing it by hand.
 
-    Numbers `##` (1.), `###` (1.1), `####` (1.1.1) and `#####` (1.1.1.1),
-    resetting the lower-level counters when moving up a section. Ignores headings
-    inside code fences. Enabled by default; disable it with `numbering: false` in
-    the front matter if the document already carries hand-written numbering (to
-    avoid duplicating it)."""
-    h2 = h3 = h4 = h5 = 0
+def detect_base_level(body_md):
+    """The document's own top heading level: the shallowest one it actually uses
+    (outside code fences).
+
+    Two conventions are in the wild and both are valid. When the title comes from
+    the front matter, `#` is free and the sections are `#`, `##`, `###`. When the
+    title is the body's first `# `, that heading is consumed as the title and the
+    sections start at `##`. Everything that counts levels — section numbers, the
+    TOC, the PDF outline, the page break per section, figure/table numbering — is
+    measured from this base, so both conventions render as `1`, `1.1`, `1.1.1`
+    instead of one of them starting at `0.1`.
+
+    Returns 2 for a body with no headings (the historical default)."""
+    in_fence = False
+    levels = []
+    for line in body_md.split("\n"):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        m = None if in_fence else _HEADING_RE.match(line)
+        if m:
+            levels.append(len(m.group(1)))
+    return min(levels) if levels else 2
+
+
+def apply_section_numbering(body_md, base=2):
+    """Auto-number the headings in the Markdown before converting it, so the
+    number appears the same in the body, the table of contents, and the PDF
+    bookmarks (outline), without the author writing it by hand.
+
+    `base` is the document's top level (see detect_base_level): it gets `1.`,
+    `2.`, `3.`…, the level below it `1.1`, then `1.1.1` and `1.1.1.1`, resetting
+    the lower-level counters when moving back up. Headings deeper than
+    NUMBERED_LEVELS below the base are left alone, as are those inside code
+    fences. Enabled by default; disable it with `numbering: false` in the front
+    matter if the document already carries hand-written numbering (to avoid
+    duplicating it)."""
+    counters = [0] * NUMBERED_LEVELS
     in_fence = False
     out = []
     for line in body_md.split("\n"):
@@ -822,22 +854,17 @@ def apply_section_numbering(body_md):
             out.append(line)
             continue
         m = None if in_fence else _HEADING_RE.match(line)
-        level = len(m.group(1)) if m else 0
-        if level == 2:
-            h2 += 1
-            h3 = h4 = h5 = 0
-            out.append(f"## {h2}. {m.group(2)}")
-        elif level == 3:
-            h3 += 1
-            h4 = h5 = 0
-            out.append(f"### {h2}.{h3} {m.group(2)}")
-        elif level == 4:
-            h4 += 1
-            h5 = 0
-            out.append(f"#### {h2}.{h3}.{h4} {m.group(2)}")
-        elif level == 5:
-            h5 += 1
-            out.append(f"##### {h2}.{h3}.{h4}.{h5} {m.group(2)}")
+        depth = len(m.group(1)) - base if m else -1
+        if 0 <= depth < NUMBERED_LEVELS:
+            counters[depth] += 1
+            for i in range(depth + 1, NUMBERED_LEVELS):
+                counters[i] = 0
+            # The top level keeps its trailing dot ("1."); deeper ones don't
+            # ("1.1"), which is the usual convention and what this tool has
+            # always emitted.
+            number = ".".join(str(c) for c in counters[:depth + 1])
+            dot = "." if depth == 0 else ""
+            out.append(f"{m.group(1)} {number}{dot} {m.group(2)}")
         else:
             out.append(line)
     return "\n".join(out)
@@ -1041,14 +1068,16 @@ def _format_reference(entry, lang, strings):
     return " ".join(parts)
 
 
-def process_citations(body_md, bib_entries, style, lang, strings):
+def process_citations(body_md, bib_entries, style, lang, strings, base=2):
     """Replace the body's `[@key]` citations with linked markers and build the
     references section from the cited entries. Returns
     (markdown_with_markers, references_markdown|None).
 
     Numbers the keys in order of first appearance. The markers jump to the
     entry's `ref-<key>` anchor. Warns about keys missing from the `.bib` and
-    leaves `@key` visible. Ignores citations inside code fences."""
+    leaves `@key` visible. Ignores citations inside code fences. The references
+    heading is emitted at `base`, the document's own top level, so it is
+    numbered and broken onto its own page like any other section."""
     cited = []            # cited keys, in order of first appearance
     number = {}           # key (lowercase) -> number
 
@@ -1115,7 +1144,7 @@ def process_citations(body_md, bib_entries, style, lang, strings):
     else:
         ordered = cited
 
-    lines = [f'## {strings["references"]}', ""]
+    lines = [f'{"#" * base} {strings["references"]}', ""]
     for key in ordered:
         marker = "" if style == "author-year" else f'[{number[key.lower()]}] '
         text = _format_reference(bib_entries[key], lang, strings)
@@ -1127,9 +1156,10 @@ def process_citations(body_md, bib_entries, style, lang, strings):
 
 # ─────────────────────── Figure/table/code numbering ───────────────────────
 
-def add_asset_numbers(html, strings):
-    """Number figures, tables and code blocks (x.y, resetting on each `<h2>`),
-    add their label, and collect the data for the indexes.
+def add_asset_numbers(html, strings, base=2):
+    """Number figures, tables and code blocks (x.y, resetting on each top-level
+    section — `base` is the document's own top heading level, see
+    detect_base_level), add their label, and collect the data for the indexes.
 
     Returns (html, figures, tables, code_blocks, missing). `missing` lists the
     labels of the elements WITHOUT a caption: an image uses its `alt`; tables and
@@ -1143,7 +1173,7 @@ def add_asset_numbers(html, strings):
     figures, tables, code_blocks, missing = [], [], [], []
     pattern = re.compile(
         r'<!--\s*caption:\s*(.*?)\s*-->'
-        r'|<h2\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>'
+        rf'|<h{base}\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>'
         r'|<div[^>]*\bclass="codehilite"[^>]*>.*?</div>'
         r'|<pre\b[^>]*>.*?</pre>',
         re.DOTALL,
@@ -1159,7 +1189,7 @@ def add_asset_numbers(html, strings):
             cap_m = re.match(r'<!--\s*caption:\s*(.*?)\s*-->', tag, re.DOTALL)
             pending_cap[0] = cap_m.group(1).strip() if cap_m else ""
             return ""   # remove the comment from the output
-        if lo.startswith('<h2'):
+        if lo.startswith(f'<h{base}'):
             section[0] += 1
             figs[0] = tabs[0] = codes[0] = 0
             pending_cap[0] = ""
@@ -1283,14 +1313,22 @@ def build_toc_html(toc_tokens, max_level, force_ids, skip_ids):
     return f'<div class="toc">\n<ul>\n{"".join(items)}</ul>\n</div>'
 
 
-def outline_css(depth):
+def heading_css(base):
+    """Page break before every top-level section. `base` is the document's own
+    top heading level (see detect_base_level), so a `#`-based document breaks on
+    `#` and a `##`-based one on `##`."""
+    return f".body h{base} {{ break-before: page; }}"
+
+
+def outline_css(depth, base=2):
     """`bookmark-level` rules for the PDF outline, generated from the TOC depth so
-    they match it: levels `##`…`#depth#` are marked; deeper ones only if forced
+    they match it: levels `base`…`depth` are marked; deeper ones only if forced
     with `<!-- toc -->` (`toc-force`), and those marked `<!-- no-toc -->`
-    (`toc-skip`) are omitted."""
+    (`toc-skip`) are omitted. The outline always starts at bookmark-level 1, so
+    the top-level sections sit at the root whatever heading level they use."""
     lines = []
-    for level in range(2, 7):
-        bl = level - 1
+    for level in range(base, 7):
+        bl = level - base + 1
         if level <= depth:
             lines.append(f".body h{level} {{ bookmark-level: {bl}; }}")
         else:
@@ -1361,7 +1399,12 @@ def content_html(meta, body_md, strings, code_style, page_size,
                  bib_entries=None, citation_style="numeric"):
     """TOC + indexes + body in a single HTML. Raises ValueError if any element
     lacks a caption."""
-    # The TocExtension captures every level (2-6); the real TOC depth (toc_depth)
+    # The document's own top heading level: `#` when the title comes from the
+    # front matter, `##` in the older convention where `#` was the title.
+    # Numbering, the TOC, the outline, the per-section page break and the
+    # figure/table numbering are all measured from it.
+    base = detect_base_level(body_md)
+    # The TocExtension captures every level (1-6); the real TOC depth (toc_depth)
     # and the individual marks are applied later when building the TOC from
     # `md.toc_tokens`. `attr_list` lets us inject the `toc-force` / `toc-skip`
     # classes from the `<!-- toc -->` comments.
@@ -1371,17 +1414,19 @@ def content_html(meta, body_md, strings, code_style, page_size,
         # that follows an unordered one as a separate <ol> instead of merging
         # them into one <ul> (which rendered the numbers as bullets).
         tab_length=2,
-        extensions=[TocExtension(toc_depth="2-6"), "tables", "fenced_code",
+        extensions=[TocExtension(toc_depth="1-6"), "tables", "fenced_code",
                     "codehilite", "attr_list", "sane_lists"],
         extension_configs={"codehilite": {
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}"}},
     )
     # Citations and bibliography: processed before numbering so the "References"
-    # section (one more `##`) enters the numbering, the TOC, and the outline.
+    # section (one more top-level heading) enters the numbering, the TOC, and
+    # the outline.
     if bib_entries:
         body_md, refs_md = process_citations(
-            body_md, bib_entries, citation_style, meta.get("lang", "es"), strings)
+            body_md, bib_entries, citation_style, meta.get("lang", "es"), strings,
+            base)
         if refs_md:
             body_md = f"{body_md}\n\n{refs_md}"
     # Individual TOC marks (`<!-- toc -->` / `<!-- no-toc -->`): translated into
@@ -1392,7 +1437,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
     # converting, so the number is reflected in the body, the TOC, and the
     # outline. Disabled with `numbering: false`.
     if _truthy(meta.get("numbering")):
-        body_md = apply_section_numbering(body_md)
+        body_md = apply_section_numbering(body_md, base)
     # Blocks with their own theme are highlighted separately and re-injected after
     # conversion; the rest use the document-wide theme (code_style) via codehilite.
     body_md, themed_blocks = extract_themed_blocks(body_md)
@@ -1408,7 +1453,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
     force_ids, skip_ids = collect_toc_overrides(body)
     toc_tree = build_toc_html(toc_tokens, toc_depth, force_ids, skip_ids)
 
-    body, figures, tables, code_blocks, missing = add_asset_numbers(body, strings)
+    body, figures, tables, code_blocks, missing = add_asset_numbers(body, strings, base)
     if missing:
         raise ValueError(
             "elements without a caption (add <!-- caption: ... --> or an alt): "
@@ -1422,7 +1467,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{outline_css(toc_depth)}</style>
+<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{heading_css(base)}{outline_css(toc_depth, base)}</style>
 </head>
 <body>
 <div class="toc-page">
