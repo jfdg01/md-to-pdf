@@ -240,8 +240,9 @@ def extract_themed_blocks(body_md):
 
 
 # ─────────────────────────── CSS ───────────────────────────
-# Sizes bumped +1 pt over the previous version, except the header/footer, which
-# stay at 9.5 pt.
+# The body text is 11pt (`text_size`). Every other size is in rem (a multiple of
+# the body size), so `text_size` scales the whole document. The value in rem is
+# the old pt size / 11. The header and footer stay in pt (see page_css).
 
 BASE_CSS = """
 html, body {
@@ -273,20 +274,20 @@ html, body {
 }
 .cover h1 {
     font-family: 'Space Grotesk', Arial, sans-serif;
-    font-size: 26pt;
+    font-size: 2.3636rem;
     font-weight: bold;
     border: none;
     margin: 0 0 20px 0;
     line-height: 1.3;
 }
-.cover .subtitle  { font-size: 15pt; font-style: italic; color: #444; margin: 0 0 6px 0; }
-.cover .meta-line { font-size: 11.5pt; color: #555; margin: 3px 0; }
+.cover .subtitle  { font-size: 1.3636rem; font-style: italic; color: #444; margin: 0 0 6px 0; }
+.cover .meta-line { font-size: 1.0455rem; color: #555; margin: 3px 0; }
 .cover .logo      { max-width: 180px; max-height: 180px; object-fit: contain; margin: 40px 0; }
-.cover .author    { font-size: 13pt; font-style: italic; color: #333; padding-bottom: 1cm; }
+.cover .author    { font-size: 1.1818rem; font-style: italic; color: #333; padding-bottom: 1cm; }
 
 /* ── Table of contents ── */
 .toc-page { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
-.toc-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17pt; margin-bottom: 20px; }
+.toc-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 1.5455rem; margin-bottom: 20px; }
 /* TOC font: force the document serif on every element of the TOC tree, so it
    doesn't inherit a system font. */
 .toc-page .toc, .toc-page .toc * { font-family: 'Source Serif 4', Georgia, serif; }
@@ -300,7 +301,7 @@ html, body {
 /* ── Lists of figures/tables/code ── */
 .indices-section { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
 .idx-block { margin-bottom: 32px; }
-.idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 17pt; margin-bottom: 16px; }
+.idx-block h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 1.5455rem; margin-bottom: 16px; }
 .doc-index { list-style: none; margin: 0; padding: 0; }
 .doc-index li { padding: 5px 0; }
 .doc-index a { text-decoration: none; color: #1a1a1a; }
@@ -309,28 +310,28 @@ html, body {
 /* ── Content ── */
 a { color: #5a8fc4; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', Arial, sans-serif; }
-h1 { font-size: 19pt; margin-bottom: 16px; }
-/* Each top-level section starts on a new page. Which level that is depends on
-   the document (see detect_base_level), so the rule is emitted by
-   heading_css(); the forced break after the TOC and this one merge, so no blank
-   page appears. */
-h2 { font-size: 16pt; margin-top: 28px; }
-h3 { font-size: 13.5pt; margin-top: 20px; color: #222; }
-h4 { font-size: 12pt; margin-top: 18px; color: #333; }
-h5 { font-size: 11pt; margin-top: 16px; color: #444; }
+h1 { font-size: 1.7273rem; margin-bottom: 16px; }
+/* With `page_break: true`, each top-level section starts on a new page. Which
+   level that is depends on the document (see detect_base_level), so the rule
+   is emitted by heading_css(); the forced break after the TOC and this one
+   merge, so no blank page appears. */
+h2 { font-size: 1.4545rem; margin-top: 28px; }
+h3 { font-size: 1.2273rem; margin-top: 20px; color: #222; }
+h4 { font-size: 1.0909rem; margin-top: 18px; color: #333; }
+h5 { font-size: 1rem; margin-top: 16px; color: #444; }
 code {
     font-family: 'Space Mono', 'DejaVu Sans Mono', monospace;
     background: #f4f4f4;
     padding: 1px 4px;
     border-radius: 3px;
-    font-size: 10.5pt;
+    font-size: 0.9545rem;
 }
 pre {
     font-family: 'Space Mono', 'DejaVu Sans Mono', monospace;
     background: #f4f4f4;
     border-radius: 4px;
     padding: 12px;
-    font-size: 10pt;
+    font-size: 0.9091rem;
     line-height: 1.4;
     break-inside: avoid;
     white-space: pre-wrap;
@@ -343,7 +344,7 @@ pre code { background: none; padding: 0; }
    without the grey `pre` background covering them. */
 .codehilite { background: #f4f4f4; border-radius: 4px; padding: 12px; break-inside: avoid; }
 .codehilite pre { background: transparent; padding: 0; margin: 0; border-radius: 0; }
-table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10.5pt; break-inside: avoid; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.9545rem; break-inside: avoid; }
 th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
 th { background: #e8e8e8; font-weight: bold; }
 blockquote {
@@ -359,11 +360,11 @@ li { margin: 0; }
 li > p { margin: 0; padding: 0; }
 figure { margin: 14px auto; text-align: center; break-inside: avoid; }
 figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-figcaption { font-size: 9.5pt; color: #555; margin-top: 5px; font-style: italic; }
-caption { caption-side: bottom; font-size: 9.5pt; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
+figcaption { font-size: 0.8636rem; color: #555; margin-top: 5px; font-style: italic; }
+caption { caption-side: bottom; font-size: 0.8636rem; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
 .code-block { margin: 12px 0; break-inside: avoid; }
 .code-block > pre, .code-block > .codehilite { margin: 0; }
-.code-label { font-size: 9.5pt; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
+.code-label { font-size: 0.8636rem; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
 
 /* ── Citations and bibliography ── */
 a.cite { text-decoration: none; }
@@ -468,11 +469,11 @@ TOC_LEVEL_SELECTORS = {
 }
 
 # Default TOC line size per level (smaller and gently decreasing with depth).
-TOC_DEFAULT_SIZES = {1: "11pt", 2: "10.5pt", 3: "10pt", 4: "10pt"}
+TOC_DEFAULT_SIZES = {1: "1rem", 2: "0.9545rem", 3: "0.9091rem", 4: "0.9091rem"}
 
 # Default size of the figure/table/code list lines (a flat, single-level list,
 # so it has no per-level keys — it just follows the general `toc_size`).
-TOC_INDEX_DEFAULT_SIZE = "10.5pt"
+TOC_INDEX_DEFAULT_SIZE = "0.9545rem"
 
 
 def toc_size_css(meta):
@@ -601,6 +602,9 @@ _META_ALIASES = {
     "tema_código": "code_theme",
     "numbering": "numbering", "numeracion": "numbering",
     "numeración": "numbering", "numerar": "numbering",
+    "page_break": "page_break", "pagebreak": "page_break",
+    "salto_pagina": "page_break", "salto_página": "page_break",
+    "salto_de_pagina": "page_break", "salto_de_página": "page_break",
     "toc_depth": "toc_depth", "tocdepth": "toc_depth",
     "toc_level": "toc_depth", "toc_levels": "toc_depth",
     "profundidad_indice": "toc_depth", "profundidad_índice": "toc_depth",
@@ -681,7 +685,7 @@ _META_ALIASES = {
 DEFAULT_META = {
     "title": "", "subtitle": "", "comment": "", "author": "",
     "logo": "", "lang": "es", "code_theme": "", "numbering": "true",
-    "toc_depth": "",
+    "page_break": "false", "toc_depth": "",
     "page_size": "", "orientation": "", "margins": "",
     "margin_top": "", "margin_right": "", "margin_bottom": "",
     "margin_left": "", "bibliography": "", "citation_style": "",
@@ -1355,11 +1359,12 @@ def build_toc_html(toc_tokens, max_level, force_ids, skip_ids):
     return f'<div class="toc">\n<ul>\n{"".join(items)}</ul>\n</div>'
 
 
-def heading_css(base):
-    """Page break before every top-level section. `base` is the document's own
-    top heading level (see detect_base_level), so a `#`-based document breaks on
-    `#` and a `##`-based one on `##`."""
-    return f".body h{base} {{ break-before: page; }}"
+def heading_css(base, page_break):
+    """Page break before every top-level section, only when `page_break` is on
+    (off by default). `base` is the document's own top heading level (see
+    detect_base_level), so a `#`-based document breaks on `#` and a `##`-based
+    one on `##`."""
+    return f".body h{base} {{ break-before: page; }}" if page_break else ""
 
 
 def outline_css(depth, base=2):
@@ -1509,7 +1514,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{heading_css(base)}{outline_css(toc_depth, base)}</style>
+<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{heading_css(base, _truthy(meta.get("page_break")))}{outline_css(toc_depth, base)}</style>
 </head>
 <body>
 <div class="toc-page">

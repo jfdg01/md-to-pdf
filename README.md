@@ -112,6 +112,7 @@ If `title` is omitted, the first `# ` heading in the body is used.
 | `locale`         | `es` (default) or `en`: language of "Figure"/"Table", indexes  | Whole document      |
 | `code_theme`     | Syntax-highlight palette (see below)                           | Code blocks         |
 | `numbering`      | Auto-number sections (default `true`; `false` to disable)      | Sections + TOC      |
+| `page_break`     | `true` starts each top-level section on a new page (default `false`) | Body sections |
 | `toc_depth`      | Deepest TOC level: `3` (`###`), `4` (`####`, default), `5`     | TOC + bookmarks     |
 | `page_size`      | `a4` (default), `a5`, `a3`, `letter`, `legal`, `b5`, `ledger`… | Whole document      |
 | `orientation`    | `portrait` (default) or `landscape`                           | Whole document      |
@@ -128,8 +129,9 @@ Spanish aliases are accepted (`titulo`, `autor`, `imagen`, `idioma`,
 
 ### Body rules
 
-- **`## ` = section**, and starts on a **new page**.
-- **`### `/`#### `/`##### ` = subsections**, no page break.
+- **`## ` = section**. Set `page_break: true` to start each one on a **new page**
+  (off by default).
+- **`### `/`#### `/`##### ` = subsections**, never a page break.
 - Sections are numbered automatically (`1.`, `1.1`, `1.1.1`…). Disable with
   `numbering: false` if your text already carries the numbers.
 - The **TOC** lists headings up to `toc_depth` (default `####`) with clickable
@@ -306,6 +308,11 @@ To customize the default palette, edit the `CODE_PALETTE` dict near the top of
 Every piece of rendered text has a size key, settable in the front matter or a
 theme. A bare number is points (`14` → `14pt`); any CSS unit (`1.2em`, `12px`)
 is kept as-is.
+
+Every size scales with `text_size`, the same as a word processor's base size:
+`text_size: 12` makes the headings, code, tables and captions grow in
+proportion. Only the header and footer stay fixed. The defaults below are at
+`text_size: 11`. A per-section key pins that one size.
 
 | Key                  | Sizes                                              | Default  |
 |----------------------|----------------------------------------------------|----------|

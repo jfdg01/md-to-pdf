@@ -33,6 +33,7 @@ locale: es                            # es (default) | en
 
 # ── Sections & table of contents ─────────────────────────────────────────────
 numbering: true                       # auto-number sections: true | false
+page_break: false                     # new page per top-level section: true | false
 toc_depth: 4                          # deepest TOC level: 3 (###) | 4 (####) | 5
 
 
@@ -58,21 +59,23 @@ citation_style: numeric               # numeric ([1]) | author-year ((Smith, 202
 
 # ── Font sizes ───────────────────────────────────────────────────────────────
 # A bare number is points (14 -> 14pt); any CSS unit also works (1.2em, 12px).
+# Every size below follows text_size: text_size: 12 scales the whole document.
+# The values shown are at text_size 11. Uncomment a key to pin that size.
 text_size:          11                # body text
-title_size:         26                # cover title
-subtitle_size:      15                # cover subtitle
-comment_size:       11.5              # cover comment line
-author_size:        13                # cover author (footer uses footer_size)
-h1_size:            19                # body headings, per level
-h2_size:            16
-h3_size:            13.5
-h4_size:            12
-h5_size:            11
+# title_size:       26                # cover title
+# subtitle_size:    15                # cover subtitle
+# comment_size:     11.5              # cover comment line
+# author_size:      13                # cover author (footer uses footer_size)
+# h1_size:          19                # body headings, per level
+# h2_size:          16
+# h3_size:          13.5
+# h4_size:          12
+# h5_size:          11
 # h6_size:          11                # h6 has no built-in size; uncomment to set
-code_size:          10                # code blocks and inline code
-table_size:         10.5              # tables
-caption_size:       9.5               # figure/table captions and code labels
-index_heading_size: 17                # "Contents" / "List of …" page headings
+# code_size:        10                # code blocks and inline code
+# table_size:       10.5              # tables
+# caption_size:     9.5               # figure/table captions and code labels
+# index_heading_size: 17             # "Contents" / "List of …" page headings
 header_size:        9                 # running header (title · subtitle)
 footer_size:        9                 # running footer (author) and page number
 
@@ -82,7 +85,7 @@ footer_size:        9                 # running footer (author) and page number
 # (1 = top-level ## entries, 2 = ###, 3 = ####, 4 = #####). Per-level wins over
 # toc_size; deeper levels inherit level 4. toc_size also sizes the index lists.
 # toc_size: 11
-toc1_size: 11
-toc2_size: 10.5
-toc3_size: 10
-toc4_size: 10
+# toc1_size: 11
+# toc2_size: 10.5
+# toc3_size: 10
+# toc4_size: 10
