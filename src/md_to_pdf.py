@@ -389,7 +389,11 @@ ul, ol { margin: 6px 0; padding-left: 2em; }
 li { margin: 0; }
 li > p { margin: 0; padding: 0; }
 figure { margin: 14px auto; text-align: center; break-inside: avoid; }
-figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+figure img {
+    max-width: 100%; height: auto; display: block; margin: 0 auto;
+    /* A thin dashed frame, with a small transparent gap around the image. */
+    padding: 4px; border: 0.75pt dashed #808080; box-sizing: border-box;
+}
 figcaption { font-size: 0.8636rem; color: #555; margin-top: 5px; font-style: italic; }
 caption { caption-side: bottom; font-size: 0.8636rem; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
 .code-block { margin: 12px 0; break-inside: avoid; }
