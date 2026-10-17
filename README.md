@@ -300,6 +300,21 @@ so one block can use a different palette from the document. If a `<!-- caption:
 ` ``
 ```
 
+### File name
+
+`<!-- file: PATH -->` above a fence adds a window bar on top of the block: three
+dots on the left and `PATH` in the center. The bar takes its colors from the
+block's theme. Put it between the `<!-- caption: -->` and the `<!-- code-theme:
+-->`.
+
+```markdown
+<!-- caption: Entry point -->
+<!-- file: src/main.py -->
+` ``python
+print("hi")
+` ``
+```
+
 To customize the default palette, edit the `CODE_PALETTE` dict near the top of
 `src/md_to_pdf.py` (each key is a hex color).
 
@@ -325,6 +340,7 @@ proportion. Only the header and footer stay fixed. The defaults below are at
 | `code_size`          | Code blocks and inline code                        | `10pt`   |
 | `table_size`         | Tables                                             | `10.5pt` |
 | `caption_size`       | Figure captions, table captions, code-block labels | `9.5pt`  |
+| `code_file_size`     | The `<!-- file: -->` bar above a code block        | `8.8pt`  |
 | `index_heading_size` | "Contents" / "List of …" page headings             | `17pt`   |
 | `header_size`        | Running header                                     | `9pt`    |
 | `footer_size`        | Running footer and page number                     | `9pt`    |

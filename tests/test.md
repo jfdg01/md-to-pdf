@@ -61,12 +61,14 @@ A horizontal rule follows:
 ## Code blocks
 
 <!-- caption: Plain block, no language -->
+<!-- file: terminal -->
 ```
 $ md-to-pdf report.md
   report.md -> report.pdf [OK, 142 KB]
 ```
 
 <!-- caption: Python with syntax highlighting -->
+<!-- file: src/fib.py -->
 ```python
 def fib(n):
     a, b = 0, 1
@@ -78,6 +80,7 @@ def fib(n):
 A per-block theme overrides the document theme via `<!-- code-theme: -->`:
 
 <!-- caption: JSON with a per-block monokai theme -->
+<!-- file: config/print.json -->
 <!-- code-theme: monokai -->
 ```json
 { "printBackground": true, "paperWidth": 8.27 }

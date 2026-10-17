@@ -365,6 +365,22 @@ caption { caption-side: bottom; font-size: 0.8636rem; color: #555; padding-top: 
 .code-block { margin: 12px 0; break-inside: avoid; }
 .code-block > pre, .code-block > .codehilite { margin: 0; }
 .code-label { font-size: 0.8636rem; color: #555; margin: 4px 0 0; font-style: italic; text-align: center; }
+/* File-name bar from `<!-- file: path -->`: a window bar on top of the block,
+   three dots on the left and the name in the center. Its colors come from the
+   block's theme, set inline by code_file_bar(). */
+.code-file {
+    font-family: 'Space Grotesk', Arial, sans-serif;
+    font-size: 0.8rem;
+    padding: 5px 12px;
+    border-radius: 6px 6px 0 0;
+    text-align: center;
+    position: relative;
+    break-after: avoid;
+    margin-bottom: -1px;  /* overlap the block: no light seam line between the two */
+}
+.code-file .dots { position: absolute; left: 12px; top: 50%; margin-top: -4px; font-size: 0; line-height: 0; }
+.code-file .dots i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.code-file + .codehilite, .code-file + pre { border-radius: 0 0 6px 6px; }
 
 /* ── Citations and bibliography ── */
 a.cite { text-decoration: none; }
@@ -423,6 +439,7 @@ FONT_SIZE_SELECTORS = {
     "table_size":    "table",                  # tables
     # figure captions, table captions, and code-block labels (one knob)
     "caption_size":  "figcaption, caption, .code-label",
+    "code_file_size": ".code-file",            # the `<!-- file: -->` bar
     # the "Contents" / "List of …" headings on the generated index pages
     "index_heading_size": ".toc-page h2, .idx-block h2",
 }
@@ -658,6 +675,8 @@ _META_ALIASES = {
     "caption_size": "caption_size", "tamano_pie_figura": "caption_size",
     "tamaño_pie_figura": "caption_size", "tamano_leyenda": "caption_size",
     "tamaño_leyenda": "caption_size",
+    "code_file_size": "code_file_size", "file_size": "code_file_size",
+    "tamano_archivo": "code_file_size", "tamaño_archivo": "code_file_size",
     "index_heading_size": "index_heading_size",
     "tamano_titulo_indice": "index_heading_size",
     "tamaño_titulo_indice": "index_heading_size",
@@ -694,7 +713,7 @@ DEFAULT_META = {
     "subtitle_size": "", "comment_size": "", "author_size": "",
     "h1_size": "", "h2_size": "", "h3_size": "", "h4_size": "",
     "h5_size": "", "h6_size": "",
-    "code_size": "", "table_size": "", "caption_size": "",
+    "code_size": "", "table_size": "", "caption_size": "", "code_file_size": "",
     "index_heading_size": "",
     "header_size": "", "footer_size": "",
     "toc_size": "", "toc1_size": "", "toc2_size": "", "toc3_size": "",
@@ -1202,6 +1221,39 @@ def process_citations(body_md, bib_entries, style, lang, strings, base=2):
 
 # ─────────────────────── Figure/table/code numbering ───────────────────────
 
+def _mix(color, other, t):
+    """Blend two `#rrggbb` colors: t=0 gives `color`, t=1 gives `other`. Any
+    other color format is returned unchanged."""
+    c, o = color.lstrip("#"), other.lstrip("#")
+    if len(c) != 6 or len(o) != 6:
+        return color
+    rgb = [round(int(c[i:i + 2], 16) * (1 - t) + int(o[i:i + 2], 16) * t)
+           for i in (0, 2, 4)]
+    return "#" + "".join(f"{v:02x}" for v in rgb)
+
+
+def _is_dark(color):
+    c = color.lstrip("#")
+    return len(c) == 6 and sum(int(c[i:i + 2], 16) for i in (0, 2, 4)) < 3 * 128
+
+
+def code_file_bar(path, box):
+    """The `<!-- file: path -->` bar for one code block. `box` is the block's
+    HTML (the `.codehilite` div or a bare `<pre>`): the bar takes the theme's
+    background and text color from its inline styles, so it matches any
+    `code_theme`. The bar is a little lighter than a dark block and a little
+    darker than a light one."""
+    bg_m = re.search(r'background:\s*(#[0-9a-fA-F]{6})', box)
+    fg_m = re.search(r'<pre[^>]*style="[^"]*color:\s*(#[0-9a-fA-F]{6})', box)
+    bg = bg_m.group(1) if bg_m else "#f4f4f4"
+    fg = fg_m.group(1) if fg_m else "#1a1a1a"
+    bar = _mix(bg, "#ffffff" if _is_dark(bg) else "#000000", 0.08)
+    dots = "".join(f'<i style="background:{c}"></i>'
+                   for c in ("#ff5f57", "#febc2e", "#28c840"))
+    return (f'<div class="code-file" style="background:{bar};color:{fg}">'
+            f'<span class="dots">{dots}</span>{escape(path)}</div>')
+
+
 def add_asset_numbers(html, strings, base=2):
     """Number figures, tables and code blocks (x.y, resetting on each top-level
     section — `base` is the document's own top heading level, see
@@ -1210,15 +1262,17 @@ def add_asset_numbers(html, strings, base=2):
     Returns (html, figures, tables, code_blocks, missing). `missing` lists the
     labels of the elements WITHOUT a caption: an image uses its `alt`; tables and
     code blocks require `<!-- caption: -->`. If `missing` is not empty, the
-    caller refuses to generate the PDF."""
+    caller refuses to generate the PDF. A `<!-- file: path -->` above a code
+    block adds the file-name bar on top of it (see code_file_bar)."""
     section = [0]
     figs = [0]
     tabs = [0]
     codes = [0]
     pending_cap = [""]
+    pending_file = [""]
     figures, tables, code_blocks, missing = [], [], [], []
     pattern = re.compile(
-        r'<!--\s*caption:\s*(.*?)\s*-->'
+        r'<!--\s*(?:caption|file):\s*.*?\s*-->'
         rf'|<h{base}\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>'
         r'|<div[^>]*\bclass="codehilite"[^>]*>.*?</div>'
         r'|<pre\b[^>]*>.*?</pre>',
@@ -1232,13 +1286,14 @@ def add_asset_numbers(html, strings, base=2):
         tag = m.group(0)
         lo = tag.lower()
         if lo.startswith('<!--'):
-            cap_m = re.match(r'<!--\s*caption:\s*(.*?)\s*-->', tag, re.DOTALL)
-            pending_cap[0] = cap_m.group(1).strip() if cap_m else ""
+            m2 = re.match(r'<!--\s*(caption|file):\s*(.*?)\s*-->', tag, re.DOTALL)
+            pending = pending_cap if m2.group(1) == "caption" else pending_file
+            pending[0] = m2.group(2).strip()
             return ""   # remove the comment from the output
         if lo.startswith(f'<h{base}'):
             section[0] += 1
             figs[0] = tabs[0] = codes[0] = 0
-            pending_cap[0] = ""
+            pending_cap[0] = pending_file[0] = ""
             return tag
         if lo.startswith('<img'):
             if not section[0]:
@@ -1280,8 +1335,10 @@ def add_asset_numbers(html, strings, base=2):
                 missing.append(num_label)
             code_blocks.append((num_label, caption, code_id))
             rendered = escape(_full_label(num_label, caption))
+            bar = code_file_bar(pending_file[0], tag) if pending_file[0] else ""
+            pending_file[0] = ""
             return (
-                f'<div class="code-block" id="{code_id}">{tag}'
+                f'<div class="code-block" id="{code_id}">{bar}{tag}'
                 f'<p class="code-label">{rendered}</p></div>'
             )
         return tag

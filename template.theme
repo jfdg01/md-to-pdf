@@ -75,6 +75,7 @@ text_size:          11                # body text
 # code_size:        10                # code blocks and inline code
 # table_size:       10.5              # tables
 # caption_size:     9.5               # figure/table captions and code labels
+# code_file_size:   8.8               # the <!-- file: --> bar above a code block
 # index_heading_size: 17             # "Contents" / "List of …" page headings
 header_size:        9                 # running header (title · subtitle)
 footer_size:        9                 # running footer (author) and page number
