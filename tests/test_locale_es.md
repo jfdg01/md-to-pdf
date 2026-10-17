@@ -3,14 +3,12 @@ title: Prueba de idioma
 subtitle: Etiquetas en español
 author: Test User
 locale: es
-bibliography: test_refs_es.bib
 ---
 
 ## Introducción
 
 Con `locale: es` (el valor por defecto) las etiquetas automáticas salen en
-español: «Figura», «Tabla», «Bloque de código», «Índice de contenidos» y la
-sección «Referencias».
+español: «Figura», «Tabla», «Bloque de código» e «Índice de contenidos».
 
 <!-- caption: Una montaña nevada al amanecer -->
 ![Montaña nevada](../assets/img/foto1.jpg)
@@ -20,5 +18,3 @@ sección «Referencias».
 |----------|----------|------------------|
 | `margin` | `float`  | `1.15`           |
 | `font`   | `string` | `Source Serif 4` |
-
-El método sigue trabajos previos [@perez2020; @garcia2019].

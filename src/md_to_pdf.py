@@ -65,9 +65,6 @@ STRINGS = {
         "figure":      "Figura",
         "table":       "Tabla",
         "code_block":  "Bloque de código",
-        "references":  "Referencias",
-        "no_date":     "s.f.",
-        "accessed":    "accedido el",
         "by":          "Realizado por",
     },
     "en": {
@@ -78,9 +75,6 @@ STRINGS = {
         "figure":      "Figure",
         "table":       "Table",
         "code_block":  "Code block",
-        "references":  "References",
-        "no_date":     "n.d.",
-        "accessed":    "accessed",
         "by":          "By",
     },
 }
@@ -419,18 +413,6 @@ caption { caption-side: bottom; font-size: 0.8636rem; color: #555; padding-top: 
 .code-file .dir { opacity: 0.55; }
 .code-file + .codehilite, .code-file + pre { border-radius: 0 0 6px 6px; }
 
-/* ── Citations and bibliography ── */
-a.cite { text-decoration: none; }
-.ref-entry {
-    display: block;
-    margin: 6px 0;
-    padding-left: 1.6em;
-    text-indent: -1.6em;   /* hanging indent: the first line sticks out */
-}
-/* A full URL is one long unbreakable token: without this it overflows the
-   column instead of wrapping. */
-.ref-url { overflow-wrap: anywhere; }
-
 /* ── Keep with the previous element ──
    Prevents a page break *before* the element and lets the element itself split
    if it doesn't fit, so it stays attached to the preceding text. The
@@ -678,13 +660,7 @@ _META_ALIASES = {
     "margin_right": "margin_right", "margen_derecho": "margin_right",
     "margin_bottom": "margin_bottom", "margen_inferior": "margin_bottom",
     "margin_left": "margin_left", "margen_izquierdo": "margin_left",
-    "bibliography": "bibliography", "bibliografia": "bibliography",
-    "bibliografía": "bibliography", "bib": "bibliography",
-    "references": "bibliography", "referencias": "bibliography",
-    "citation_style": "citation_style", "citationstyle": "citation_style",
-    "cite_style": "citation_style", "estilo_cita": "citation_style",
-    "estilo_citas": "citation_style", "estilo_de_cita": "citation_style",
-    # .theme file (path relative to the .md, like `logo` or `bibliography`).
+    # .theme file (path relative to the .md, like `logo`).
     "theme": "theme", "tema": "theme", "estilo": "theme", "style": "theme",
     "theme_file": "theme", "fichero_tema": "theme", "archivo_tema": "theme",
     # Per-section font sizes.
@@ -746,7 +722,7 @@ DEFAULT_META = {
     "page_break": "false", "toc_depth": "",
     "page_size": "", "orientation": "", "margins": "",
     "margin_top": "", "margin_right": "", "margin_bottom": "",
-    "margin_left": "", "bibliography": "", "citation_style": "",
+    "margin_left": "",
     "theme": "",
     "text_size": "", "title_size": "",
     "subtitle_size": "", "comment_size": "", "author_size": "",
@@ -823,7 +799,7 @@ def parse_front_matter(text):
 
 def load_theme(md_path, md_meta):
     """Load the `.theme` named in `theme:` (path relative to the .md, like the
-    logo or the bibliography) and return its explicit keys. The `.theme` has the
+    logo) and return its explicit keys. The `.theme` has the
     same `key: value` format as the front matter; it may (optionally) be
     delimited by `---` lines, so a front matter can be reused as a theme. With no
     `theme` field, returns {}. Raises ValueError if the file does not exist."""
@@ -1008,254 +984,6 @@ def resolve_cross_refs(html, figures, tables, code_blocks):
         return f'<a href="#{aid}" class="xref">{escape(label)}</a>'
 
     return _XREF_RE.sub(repl, html)
-
-
-# ─────────────────────── Bibliography and citations ───────────────────────
-# In-body citation: `[@key]` or several together `[@key1; @key2]`. Each key is
-# replaced by a linked marker (numeric `[1]` or author-year `(Pérez, 2020)`) that
-# jumps to its entry in the references section, generated from the entries
-# actually cited. The bibliography is read from a `.bib` (BibTeX) named in the
-# front matter with `bibliography:` (path relative to the .md, like `logo`).
-_CITE_GROUP_RE = re.compile(r'\[@[^\]]+\]')
-_CITE_KEY_RE = re.compile(r'@([\w:.\-]+)')
-_INLINE_CODE_RE = re.compile(r'`+[^`]*`+')
-
-# Supported citation styles (normalized key -> canonical style).
-_CITE_STYLES = {
-    "": "numeric", "numeric": "numeric", "numerico": "numeric",
-    "numérico": "numeric", "numerica": "numeric", "numérica": "numeric",
-    "number": "numeric", "numero": "numeric",
-    "author-year": "author-year", "author_year": "author-year",
-    "authoryear": "author-year", "autor-año": "author-year",
-    "autor-ano": "author-year", "autor_año": "author-year",
-    "autor-anyo": "author-year", "autoraño": "author-year",
-}
-
-
-def resolve_citation_style(meta):
-    """Resolve `citation_style`: 'numeric' (default) or 'author-year'. Warn and
-    fall back to 'numeric' if the value is unknown (same as with `code_theme`)."""
-    name = (meta.get("citation_style") or "").strip().lower()
-    if name in _CITE_STYLES:
-        return _CITE_STYLES[name]
-    print(f"    (warning: unknown citation style '{name}'; using numeric)",
-          file=sys.stderr)
-    return "numeric"
-
-
-def load_bibliography(md_path, meta):
-    """Load the `.bib` named in `bibliography:` (path relative to the .md, like
-    the logo) and return its entries (dict key->pybtex entry, case-insensitive).
-    With no `bibliography` field, returns {} (no bibliography). Raises ValueError
-    if the file does not exist or pybtex is missing."""
-    field = (meta.get("bibliography") or "").strip()
-    if not field:
-        return {}
-    p = Path(field)
-    bib_path = p if p.is_absolute() else md_path.parent / p
-    if not bib_path.exists():
-        raise ValueError(f"bibliography '{field}' not found")
-    try:
-        from pybtex.database import parse_file
-    except ImportError:
-        raise ValueError("the bibliography needs 'pybtex' (install it with: uv sync)")
-    return parse_file(str(bib_path)).entries
-
-
-def _ref_anchor(key):
-    """Stable anchor for a bibliography entry (`ref-<key>`)."""
-    return "ref-" + re.sub(r'[^a-z0-9]+', '-', key.lower()).strip('-')
-
-
-def _clean(value):
-    """Plain text of a BibTeX field: strip braces and stray whitespace."""
-    return str(value).replace("{", "").replace("}", "").strip()
-
-
-def _persons(entry):
-    return entry.persons.get("author") or entry.persons.get("editor") or []
-
-
-def _person_last(p):
-    return _clean(" ".join(p.prelast_names + p.last_names))
-
-
-def _person_full(p):
-    """Surname(s) + initials: "Pérez, J. M."."""
-    last = _person_last(p)
-    initials = " ".join(f"{_clean(n)[0]}." for n in (p.first_names + p.middle_names)
-                        if _clean(n))
-    if last and initials:
-        return f"{last}, {initials}"
-    return last or initials
-
-
-def _entry_year(entry, strings):
-    return _clean(entry.fields.get("year", "")) or strings["no_date"]
-
-
-def _authors_full(entry, lang):
-    """Author list for the references entry ("A, B and C")."""
-    names = [_person_full(p) for p in _persons(entry)]
-    if not names:
-        return ""
-    if len(names) == 1:
-        return names[0]
-    conn = " y " if lang == "es" else " & "
-    return ", ".join(names[:-1]) + conn + names[-1]
-
-
-def _authors_short(entry, lang):
-    """Abbreviated surnames for the author-year marker ("Pérez", "Pérez et al.")."""
-    lasts = [_person_last(p) for p in _persons(entry)]
-    if not lasts:
-        return _clean(entry.fields.get("title", "")) or "?"
-    if len(lasts) == 1:
-        return lasts[0]
-    if len(lasts) == 2:
-        conn = " y " if lang == "es" else " & "
-        return lasts[0] + conn + lasts[1]
-    return f"{lasts[0]} et al."
-
-
-# A URL written as a bare `url` field, or wrapped in `\url{}` inside
-# `howpublished` (the usual way to put a link on a @misc entry).
-_BIB_URL_RE = re.compile(r'\\url\s*\{([^}]*)\}')
-
-
-def _entry_url(entry):
-    """The entry's link: `url` if present, otherwise the `\\url{...}` inside
-    `howpublished` (or `howpublished` itself when it is already a bare URL),
-    otherwise a `doi` resolved through doi.org. Empty string if there is none."""
-    fields = entry.fields
-    url = _clean(fields.get("url", ""))
-    if not url:
-        # Read `howpublished` raw: `_clean` strips the braces, which would eat
-        # the `\url{...}` delimiters this needs to match.
-        howpub = str(fields.get("howpublished", "")).strip()
-        m = _BIB_URL_RE.search(howpub)
-        url = m.group(1).strip() if m else (
-            howpub if howpub.startswith(("http://", "https://")) else "")
-    if not url:
-        doi = _clean(fields.get("doi", ""))
-        if doi:
-            url = f"https://doi.org/{doi}"
-    return url
-
-
-def _format_reference(entry, lang, strings):
-    """Entry formatted consistently:
-    "Authors (year). *Title*. Container. <link> (accessed on <date>)."
-
-    The link is written out in full and made clickable, because a printed
-    bibliography has to be usable on paper. The access date comes from
-    `urldate` (biblatex) or `accessed`, and is printed verbatim — write it in
-    the `.bib` in whatever form the document should show."""
-    fields = entry.fields
-    title = _clean(fields.get("title", ""))
-    container = _clean(fields.get("journal") or fields.get("booktitle")
-                       or fields.get("publisher") or fields.get("school")
-                       or fields.get("institution") or "")
-    authors = _authors_full(entry, lang)
-    parts = [f"{authors} ({_entry_year(entry, strings)})." if authors
-             else f"({_entry_year(entry, strings)})."]
-    if title:
-        parts.append(f"*{title}*.")
-    if container:
-        parts.append(f"{container}.")
-    url = _entry_url(entry)
-    if url:
-        accessed = _clean(fields.get("urldate") or fields.get("accessed") or "")
-        link = f'<a class="ref-url" href="{escape(url)}">{escape(url)}</a>'
-        parts.append(f'{link} ({strings["accessed"]} {escape(accessed)}).'
-                     if accessed else f"{link}")
-    return " ".join(parts)
-
-
-def process_citations(body_md, bib_entries, style, lang, strings, base=2):
-    """Replace the body's `[@key]` citations with linked markers and build the
-    references section from the cited entries. Returns
-    (markdown_with_markers, references_markdown|None).
-
-    Numbers the keys in order of first appearance. The markers jump to the
-    entry's `ref-<key>` anchor. Warns about keys missing from the `.bib` and
-    leaves `@key` visible. Ignores citations inside code fences. The references
-    heading is emitted at `base`, the document's own top level, so it is
-    numbered and broken onto its own page like any other section."""
-    cited = []            # cited keys, in order of first appearance
-    number = {}           # key (lowercase) -> number
-
-    def number_for(key):
-        k = key.lower()
-        if k not in number:
-            cited.append(key)
-            number[k] = len(cited)
-        return number[k]
-
-    def render_group(m):
-        parts = []
-        for key in _CITE_KEY_RE.findall(m.group(0)):
-            if key not in bib_entries:
-                print(f"    (warning: citation '@{key}' is not in the bibliography)",
-                      file=sys.stderr)
-                parts.append(escape(f"@{key}"))
-                continue
-            num = number_for(key)
-            if style == "author-year":
-                label = f"{_authors_short(bib_entries[key], lang)}, " \
-                        f"{_entry_year(bib_entries[key], strings)}"
-            else:
-                label = str(num)
-            parts.append(f'<a href="#{_ref_anchor(key)}" class="cite">'
-                         f'{escape(label)}</a>')
-        if style == "author-year":
-            return "(" + "; ".join(parts) + ")"
-        return "[" + ", ".join(parts) + "]"
-
-    def sub_line(line):
-        # Substitute outside inline-code spans (`...`), so a `[@key]` written as
-        # an example between backticks is left untouched.
-        parts, last = [], 0
-        for m in _INLINE_CODE_RE.finditer(line):
-            parts.append(_CITE_GROUP_RE.sub(render_group, line[last:m.start()]))
-            parts.append(m.group(0))
-            last = m.end()
-        parts.append(_CITE_GROUP_RE.sub(render_group, line[last:]))
-        return "".join(parts)
-
-    out, in_fence = [], False
-    for line in body_md.split("\n"):
-        if _FENCE_RE.match(line):
-            in_fence = not in_fence
-            out.append(line)
-        elif in_fence:
-            out.append(line)
-        else:
-            out.append(sub_line(line))
-    new_body = "\n".join(out)
-
-    if not cited:
-        return new_body, None
-
-    # List order: by citation number (numeric) or alphabetical by author
-    # (author-year). Each entry carries its `ref-<key>` anchor.
-    if style == "author-year":
-        ordered = sorted(cited, key=lambda k: (
-            _person_last(_persons(bib_entries[k])[0]).lower()
-            if _persons(bib_entries[k])
-            else _clean(bib_entries[k].fields.get("title", "")).lower(),
-            _entry_year(bib_entries[k], strings)))
-    else:
-        ordered = cited
-
-    lines = [f'{"#" * base} {strings["references"]}', ""]
-    for key in ordered:
-        marker = "" if style == "author-year" else f'[{number[key.lower()]}] '
-        text = _format_reference(bib_entries[key], lang, strings)
-        lines.append(f'<span id="{_ref_anchor(key)}" class="ref-entry">'
-                     f'{marker}{text}</span>')
-        lines.append("")
-    return new_body, "\n".join(lines)
 
 
 # ─────────────────────── Figure/table/code numbering ───────────────────────
@@ -1540,8 +1268,7 @@ def cover_html(meta, logo_uri, strings, page_size):
 </html>"""
 
 
-def content_html(meta, body_md, strings, code_style, page_size,
-                 bib_entries=None, citation_style="numeric"):
+def content_html(meta, body_md, strings, code_style, page_size):
     """TOC + indexes + body in a single HTML. Raises ValueError if any element
     lacks a caption."""
     # The document's own top heading level: `#` when the title comes from the
@@ -1568,15 +1295,6 @@ def content_html(meta, body_md, strings, code_style, page_size,
             # PHP: highlight a snippet with no `<?php` tag (other lexers ignore it).
             "startinline": True}},
     )
-    # Citations and bibliography: processed before numbering so the "References"
-    # section (one more top-level heading) enters the numbering, the TOC, and
-    # the outline.
-    if bib_entries:
-        body_md, refs_md = process_citations(
-            body_md, bib_entries, citation_style, meta.get("lang", "es"), strings,
-            base)
-        if refs_md:
-            body_md = f"{body_md}\n\n{refs_md}"
     # Individual TOC marks (`<!-- toc -->` / `<!-- no-toc -->`): translated into
     # classes before numbering and converting (they work whether numbering is on
     # or off).
@@ -1668,11 +1386,8 @@ def convert_one(md_path, out_path=None):
     base_url = md_path.resolve().parent.as_uri() + "/"
     code_style = resolve_code_style(meta.get("code_theme"))
     page_size = resolve_page_size(meta)
-    bib_entries = load_bibliography(md_path, meta)
-    citation_style = resolve_citation_style(meta) if bib_entries else "numeric"
 
-    html = content_html(meta, body_md, strings, code_style, page_size,
-                        bib_entries, citation_style)
+    html = content_html(meta, body_md, strings, code_style, page_size)
     content_pdf = weasyprint.HTML(string=html, base_url=base_url).write_pdf()
     cover_pdf = weasyprint.HTML(
         string=cover_html(meta, logo_uri, strings, page_size),

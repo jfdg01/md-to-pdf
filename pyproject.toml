@@ -10,7 +10,6 @@ dependencies = [
     "pypdf",
     "watchdog",
     "pygments>=2.20.0",
-    "pybtex>=0.26.1",
 ]
 
 [tool.uv]

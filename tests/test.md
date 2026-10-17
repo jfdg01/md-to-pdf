@@ -5,14 +5,13 @@ comment: md-to-pdf test document
 author: Test User
 logo: ../assets/img/logo_uja.webp
 locale: en
-bibliography: test_refs.bib
 ---
 
 ## Headings and numbering
 
 Sections (`##`) start on a new page and are auto-numbered (`1.`, `2.`…). This
 document shows every general feature; document-wide options (locale, page size,
-code theme, citation style) live in the other test files.
+code theme) live in the other test files.
 
 ### Subsection
 
@@ -149,9 +148,3 @@ A caption taken from the image alt text:
 
 Counters reset each section, so the figures above are **Figure 6.1** and
 **Figure 6.2**. Reference them by number: see [[fig-6-1]] and [[fig-6-2]].
-
-## Citations
-
-Citations use `[@key]` and link to the auto-generated **References** section,
-which lists only the cited entries. A single citation [@smith2020] and a grouped
-one [@brown2018; @lee2021] render numeric markers by default.

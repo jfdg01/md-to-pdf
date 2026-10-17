@@ -24,7 +24,6 @@
 # comment:      Free extra line (date, course, note…)
 # author:       Your Name
 # logo:         images/cover.png      # any image path, or `none`
-# bibliography: refs.bib              # path to a BibTeX .bib file
 
 
 # ── Language ─────────────────────────────────────────────────────────────────
@@ -51,10 +50,6 @@ margins:     1.15in 0.85in 0.95in 0.85in   # CSS order: top right bottom left
 # ── Code highlighting ────────────────────────────────────────────────────────
 code_theme: custom                    # custom (default) or any Pygments theme:
                                       # monokai, dracula, nord, github-dark…
-
-
-# ── Citations ────────────────────────────────────────────────────────────────
-citation_style: numeric               # numeric ([1]) | author-year ((Smith, 2020))
 
 
 # ── Font sizes ───────────────────────────────────────────────────────────────

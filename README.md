@@ -26,8 +26,8 @@ Mono) ship with the repo in `assets/fonts/`.
   ```
   On Windows, install them via WeasyPrint's docs (GTK runtime).
 
-Python dependencies (`markdown`, `weasyprint`, `pypdf`, `watchdog`, `pygments`,
-`pybtex`) are declared in `pyproject.toml` and pinned in `uv.lock`. `uv sync`
+Python dependencies (`markdown`, `weasyprint`, `pypdf`, `watchdog`, `pygments`)
+are declared in `pyproject.toml` and pinned in `uv.lock`. `uv sync`
 installs them into a project-local virtual environment (`.venv/`).
 
 ---
@@ -117,14 +117,11 @@ If `title` is omitted, the first `# ` heading in the body is used.
 | `page_size`      | `a4` (default), `a5`, `a3`, `letter`, `legal`, `b5`, `ledger`… | Whole document      |
 | `orientation`    | `portrait` (default) or `landscape`                           | Whole document      |
 | `margins`        | Body margins as CSS (`1.15in 0.85in 0.95in 0.85in`)           | Whole document      |
-| `bibliography`   | Path to a `.bib` (BibTeX) file for citations                  | "References" section|
-| `citation_style` | `numeric` (default, `[1]`) or `author-year` (`(Smith, 2020)`) | Citation markers    |
 | `*_size`         | Per-section font sizes (see Font sizes)                        | The matching part   |
 | `theme`          | Path to a `.theme` file of shared defaults (see Theme files)   | Whole document      |
 
 Spanish aliases are accepted (`titulo`, `autor`, `imagen`, `idioma`,
-`numeracion`, `tamaño`, `orientacion`, `margenes`, `bibliografia`,
-`estilo_cita`…). Margins can also be set per side with `margin_top`,
+`numeracion`, `tamaño`, `orientacion`, `margenes`…). Margins can also be set per side with `margin_top`,
 `margin_right`, `margin_bottom`, `margin_left`.
 
 ### Body rules
@@ -193,47 +190,6 @@ def main():
 ` ``
 ```
 
-### Citations and bibliography
-
-Point `bibliography:` at a **BibTeX** file (path relative to the `.md`, like
-`logo:`) and cite in the body with `[@key]` (group several as `[@a; @b]`):
-
-```markdown
----
-title: My report
-bibliography: refs.bib
-citation_style: numeric   # numeric (default) | author-year
----
-
-## Introduction
-
-The method builds on prior work [@smith2020; @brown2018].
-```
-
-Each `[@key]` becomes a linked marker — `[1]` (numeric) or `(Smith, 2020)`
-(author-year) — that jumps to its entry. A **References** section
-("Referencias" with `locale: es`) is generated automatically with only the
-cited entries; it is a normal numbered section and appears in the TOC and
-bookmarks. Order is by appearance (numeric) or alphabetical by author
-(author-year). Missing keys are reported and left visible.
-
-An entry's **link is written out in full** and made clickable, so the
-bibliography stays usable on paper. It is taken from `url`, from a `\url{...}`
-inside `howpublished`, or from `doi` (resolved via doi.org). Add `urldate` (or
-`accessed`) and it is printed alongside as "accedido el …" / "accessed …",
-verbatim — write the date in the `.bib` in whatever form the document should
-show:
-
-```bibtex
-@misc{nvidia2024orinpower,
-  title        = {Platform Power and Performance},
-  author       = {{NVIDIA}},
-  howpublished = {\url{https://docs.nvidia.com/jetson/...}},
-  year         = {2024},
-  urldate      = {27 de julio de 2026}
-}
-```
-
 ### Page size and margins
 
 Defaults to **A4 portrait**. Override with `page_size`, `orientation`, and
@@ -265,7 +221,7 @@ theme: house-style.theme   # path relative to the .md
 
 Precedence is **built-in defaults < `.theme` < the document's front matter**, so
 any key the document sets itself overrides the theme. A `.theme` can hold any
-front-matter key (page size, margins, `code_theme`, citation style, font sizes,
+front-matter key (page size, margins, `code_theme`, font sizes,
 even `author`), but not `theme` itself (themes don't chain). A `#` starts a
 comment — either a whole line or inline after a value (`text_size: 14  # body`);
 a `#` with no space before it (like a `#rrggbb` color) is kept as part of the
