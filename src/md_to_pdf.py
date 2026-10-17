@@ -26,8 +26,9 @@ from pygments.formatters import HtmlFormatter
 from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.style import Style
 from pygments.styles import get_style_by_name
-from pygments.token import (Comment, Error, Generic, Keyword, Name, Number,
-                            Operator, String, Text, Token)
+from pygments.filter import simplefilter
+from pygments.token import (Comment, Error, Generic, Keyword, Literal, Name,
+                            Number, Operator, Punctuation, String, Text, Token)
 from pygments.util import ClassNotFound
 import pypdf
 import weasyprint
@@ -172,12 +173,46 @@ def _build_custom_style(palette):
             Number:         palette["number"],
             Operator:       palette["operator"],
             Generic.Error:  palette["error"],
+            # YAML: keys (`Name.Tag`, also HTML/XML tags), plain values (the
+            # `Literal` parent, so String/Number keep their own entries),
+            # `-`/`{` markers, anchors and aliases.
+            Name.Tag:       palette["function"],
+            Literal:        palette["string"],
+            Punctuation.Indicator: palette["operator"],
+            Name.Label:     palette["builtin"],
+            Name.Variable:  palette["builtin"],
             Error:          palette["error"],
         },
     })
 
 
 CUSTOM_CODE_STYLE = _build_custom_style(CODE_PALETTE)
+
+_YAML_NUMBER = re.compile(r'[-+]?(\d[\d_]*(\.\d*)?([eE][-+]?\d+)?|\.inf|\.nan|0x[0-9a-fA-F]+)')
+_YAML_CONSTANT = {"true", "false", "yes", "no", "on", "off", "null", "~"}
+
+
+@simplefilter
+def _yaml_scalars(self, lexer, stream, options):
+    """The Pygments YAML lexer emits every unquoted value as one token type
+    (`Literal.Scalar.Plain`). Give numbers the `Number` type and booleans/null
+    the `Keyword.Constant` type, so every theme colors them as in an editor.
+    Only YAML emits `Literal.Scalar.Plain`, so the other lexers are not
+    affected. Passed to every lexer through the `filters` option."""
+    for ttype, value in stream:
+        if ttype is Literal.Scalar.Plain:
+            if _YAML_NUMBER.fullmatch(value):
+                ttype = Number
+            elif value.lower() in _YAML_CONSTANT:
+                ttype = Keyword.Constant
+        yield ttype, value
+
+
+def yml_fences(body_md):
+    """Pygments has no `yml` alias (only `yaml`): rename the fence language so
+    a ```yml block is highlighted too."""
+    return re.sub(r'^([ \t]*(?:```|~~~)[ \t]*)yml[ \t]*$', r'\1yaml', body_md,
+                  flags=re.MULTILINE)
 
 
 def _style_fg(style):
@@ -227,7 +262,7 @@ def extract_themed_blocks(body_md):
         lang = (m.group("lang") or "").strip() or "text"
         style = resolve_code_style(m.group("theme"))
         try:
-            lexer = get_lexer_by_name(lang)
+            lexer = get_lexer_by_name(lang, filters=[_yaml_scalars()])
         except ClassNotFound:
             lexer = TextLexer()
         formatter = HtmlFormatter(style=style, noclasses=True, cssclass="codehilite",
@@ -1522,7 +1557,8 @@ def content_html(meta, body_md, strings, code_style, page_size,
                     "codehilite", "attr_list", "sane_lists"],
         extension_configs={"codehilite": {
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
-            "prestyles": f"color:{_style_fg(code_style)}"}},
+            "prestyles": f"color:{_style_fg(code_style)}",
+            "filters": [_yaml_scalars()]}},
     )
     # Citations and bibliography: processed before numbering so the "References"
     # section (one more top-level heading) enters the numbering, the TOC, and
@@ -1544,7 +1580,7 @@ def content_html(meta, body_md, strings, code_style, page_size,
         body_md = apply_section_numbering(body_md, base)
     # Blocks with their own theme are highlighted separately and re-injected after
     # conversion; the rest use the document-wide theme (code_style) via codehilite.
-    body_md, themed_blocks = extract_themed_blocks(body_md)
+    body_md, themed_blocks = extract_themed_blocks(yml_fences(body_md))
     body = md.convert(body_md)
     toc_tokens = md.toc_tokens
     for token, snippet in themed_blocks.items():

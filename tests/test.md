@@ -86,6 +86,33 @@ A per-block theme overrides the document theme via `<!-- code-theme: -->`:
 { "printBackground": true, "paperWidth": 8.27 }
 ```
 
+YAML: keys, plain values, numbers, booleans, anchors and aliases each get a
+color. A `yml` fence works the same as `yaml`:
+
+<!-- caption: YAML with a yml fence -->
+<!-- file: config.yml -->
+```yml
+# comment
+name: md-to-pdf
+version: 1.2
+enabled: true
+missing: ~
+items:
+  - "quoted"
+  - plain text
+anchor: &base
+  key: value
+copy: *base
+```
+
+<!-- caption: The same YAML with a per-block monokai theme -->
+<!-- code-theme: monokai -->
+```yaml
+version: 1.2
+enabled: true
+items: [a, "b"]
+```
+
 The `<!-- keep -->` marker pins the block to the previous paragraph:
 
 <!-- keep -->

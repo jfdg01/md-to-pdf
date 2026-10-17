@@ -278,7 +278,9 @@ a value.
 
 ### Syntax highlighting
 
-Controlled at two levels.
+Controlled at two levels. The fence language picks the lexer (` ```python `,
+` ```json `…). ` ```yml ` is the same as ` ```yaml `. In YAML, numbers and
+`true`/`false`/`null` get their own color in every theme.
 
 **1. Whole document — `code_theme` in the front matter.** Accepts:
 
