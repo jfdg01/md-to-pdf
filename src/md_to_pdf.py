@@ -262,7 +262,8 @@ def extract_themed_blocks(body_md):
         lang = (m.group("lang") or "").strip() or "text"
         style = resolve_code_style(m.group("theme"))
         try:
-            lexer = get_lexer_by_name(lang, filters=[_yaml_scalars()])
+            lexer = get_lexer_by_name(lang, filters=[_yaml_scalars()],
+                                      startinline=True)
         except ClassNotFound:
             lexer = TextLexer()
         formatter = HtmlFormatter(style=style, noclasses=True, cssclass="codehilite",
@@ -415,6 +416,7 @@ caption { caption-side: bottom; font-size: 0.8636rem; color: #555; padding-top: 
 }
 .code-file .dots { position: absolute; left: 12px; top: 50%; margin-top: -4px; font-size: 0; line-height: 0; }
 .code-file .dots i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.code-file .dir { opacity: 0.55; }
 .code-file + .codehilite, .code-file + pre { border-radius: 0 0 6px 6px; }
 
 /* ── Citations and bibliography ── */
@@ -437,6 +439,8 @@ a.cite { text-decoration: none; }
    with previous" unsolvable, and WeasyPrint pushes the block down leaving a
    huge gap. */
 .keep-with-prev { break-before: avoid; }
+/* The element may split, but its caption never goes alone to the next page. */
+.code-label, figcaption, caption { break-before: avoid; }
 .keep-with-prev,
 .keep-with-prev .codehilite,
 .keep-with-prev pre { break-inside: auto; }
@@ -1285,8 +1289,10 @@ def code_file_bar(path, box):
     bar = _mix(bg, "#ffffff" if _is_dark(bg) else "#000000", 0.08)
     dots = "".join(f'<i style="background:{c}"></i>'
                    for c in ("#ff5f57", "#febc2e", "#28c840"))
+    folder, _, name = path.rpartition("/")
+    folder = f'<span class="dir">{escape(folder)}/</span>' if folder else ""
     return (f'<div class="code-file" style="background:{bar};color:{fg}">'
-            f'<span class="dots">{dots}</span>{escape(path)}</div>')
+            f'<span class="dots">{dots}</span>{folder}{escape(name)}</div>')
 
 
 def add_asset_numbers(html, strings, base=2):
@@ -1558,7 +1564,9 @@ def content_html(meta, body_md, strings, code_style, page_size,
         extension_configs={"codehilite": {
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}",
-            "filters": [_yaml_scalars()]}},
+            "filters": [_yaml_scalars()],
+            # PHP: highlight a snippet with no `<?php` tag (other lexers ignore it).
+            "startinline": True}},
     )
     # Citations and bibliography: processed before numbering so the "References"
     # section (one more top-level heading) enters the numbering, the TOC, and
