@@ -166,6 +166,10 @@ refuses to build the PDF. Add it with an HTML comment on the line just above:
 
 Images may instead use their alt text (`![alt](img)`) as the caption.
 
+The tool draws the dashed frame and its 4 px gap, so a figure PNG must have no margin of its own. See [`docs/figures.md`](docs/figures.md) for how to capture a window and crop it.
+
+A table wider than the text block (usually a long `code` identifier that cannot wrap) is fitted automatically: its text shrinks down to 9 pt; if that is not enough, it is centred and overhangs both margins equally, up to 0.5 cm from the page edge. A table that still does not fit is left as is and reported on the console (`warning: table N is wider than the page…`); split its columns or shorten the cell.
+
 ### Cross-references
 
 Link to a figure/table/code block by its number with double brackets:

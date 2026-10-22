@@ -375,6 +375,7 @@ pre {
     word-wrap: break-word;
 }
 pre code { background: none; padding: 0; }
+table code { font-size: 1em; }  /* follows the table, which fit_wide_tables may shrink */
 /* Highlighted blocks (codehilite with noclasses): the <div> carries the theme's
    background color inline; we make the inner <pre> transparent and move the
    padding/radius to the <div>, so dark themes (monokai, dracula…) also work
@@ -1381,6 +1382,100 @@ def merge_pdfs(cover_bytes, content_bytes, meta):
     return out.getvalue()
 
 
+# ─────────────────────── Tables wider than the text ───────────────────────
+# A column that cannot wrap (a long identifier in `code`) makes a table wider than
+# the text block, and the table then spills past the right margin only. CSS cannot
+# measure that, so the page is laid out, each overflowing table is measured, and the
+# table gets an inline style. First choice: shrink its text to fit, down to
+# TABLE_MIN_PT. If that is not enough, keep that size and centre the table, with the
+# same overhang on both sides, as far as TABLE_GUTTER_PX from the page edge. A table
+# that does not fit even then is left alone and reported.
+TABLE_MIN_PT = 9
+TABLE_GUTTER_PX = 19  # 0.5 cm
+_TABLE_TAG = re.compile(r"<table(?=[\s>])")
+
+
+def _measure_tables(doc):
+    """{n: {...}} for each `<table data-fit="n">` wider than its container: the
+    border-box width `need`, the container's `avail` width and left edge `cx`,
+    the page width and the table's font size, all in px."""
+    found = {}
+
+    def first_row_fixed(box):
+        # Width that does not shrink with the font: cell padding and borders.
+        for b in box.descendants():
+            if type(b).__name__ == "TableRowBox":
+                return sum(c.padding_left + c.padding_right + c.border_left_width
+                           + c.border_right_width for c in b.children)
+        return 0
+
+    def walk(box, up, page_w):
+        if type(box).__name__ == "TableBox" and box.element.get("data-fit"):
+            container = up[-2]
+            need = box.border_width()
+            if need > container.width + 0.5:
+                n = int(box.element.get("data-fit"))
+                t = found.setdefault(n, {"need": 0})
+                t.update(avail=container.width, cx=container.content_box_x(),
+                         page_w=page_w, font=box.style["font_size"],
+                         fixed=first_row_fixed(box))
+                t["need"] = max(t["need"], need)
+        for child in getattr(box, "children", ()):
+            walk(child, up + [box], page_w)
+
+    for page in doc.pages:
+        box = page._page_box
+        walk(box, [box], box.margin_width())
+    return found
+
+
+def fit_wide_tables(html, base_url):
+    """Lay out `html` and return the weasyprint Document, with every table that
+    overflows its text block shrunk or centred as described above."""
+    counter = iter(range(1_000_000))
+    html = _TABLE_TAG.sub(lambda m: f'<table data-fit="{next(counter)}"', html)
+    styles, done, floored = {}, set(), set()
+
+    def render():
+        def tag(m):
+            css = "; ".join(f"{k}: {v}" for k, v in styles.get(int(m.group(1)), {}).items())
+            return f'<table data-fit="{m.group(1)}"' + (f' style="{css}"' if css else "")
+        return weasyprint.HTML(
+            string=re.sub(r'<table data-fit="(\d+)"', tag, html),
+            base_url=base_url).render()
+
+    for attempt in range(4):
+        doc = render()
+        todo = {n: t for n, t in _measure_tables(doc).items() if n not in done}
+        if not todo:
+            return doc
+        for n, t in todo.items():
+            if attempt == 3:
+                print(f"    (warning: table {n + 1} is still wider than the text)",
+                      file=sys.stderr)
+                continue
+            floor = TABLE_MIN_PT * 96 / 72
+            # Only the text shrinks with the font, so scale just that part.
+            fit = t["font"] * (t["avail"] - t["fixed"]) / (t["need"] - t["fixed"]) * 0.99
+            if t["fixed"] < t["avail"] and fit >= floor:
+                styles[n] = {"font-size": f"{fit:.2f}px"}
+            elif n not in floored:
+                floored.add(n)  # shrink to the floor, then measure what is left
+                styles[n] = {"font-size": f"{floor:.2f}px"}
+            else:
+                over = t["need"] - t["avail"]
+                done.add(n)
+                if (t["cx"] - over / 2 >= TABLE_GUTTER_PX
+                        and t["cx"] + t["avail"] + over / 2 <= t["page_w"] - TABLE_GUTTER_PX):
+                    styles[n]["margin-left"] = f"-{over / 2:.2f}px"
+                else:
+                    styles.pop(n)
+                    print(f"    (warning: table {n + 1} is wider than the page and "
+                          f"cannot be fitted; split its columns or rotate it)",
+                          file=sys.stderr)
+    return doc
+
+
 def convert_one(md_path, out_path=None):
     """Convert a single .md to .pdf. By default the PDF is written next to the .md
     with the same name; with `out_path` it is written to the given path (the `-o`
@@ -1399,7 +1494,7 @@ def convert_one(md_path, out_path=None):
     page_size = resolve_page_size(meta)
 
     html = content_html(meta, body_md, strings, code_style, page_size)
-    content_pdf = weasyprint.HTML(string=html, base_url=base_url).write_pdf()
+    content_pdf = fit_wide_tables(html, base_url).write_pdf()
     cover_pdf = weasyprint.HTML(
         string=cover_html(meta, logo_uri, strings, page_size),
         base_url=base_url).write_pdf()

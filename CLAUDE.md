@@ -17,3 +17,7 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 ## Charts
 
 Reports embed charts as SVG images. Read `docs/charts.md` before you make or change a chart: it has the workflow, the colour, mark and label rules, and a checklist. `docs/charts/example.py` is the reference generator.
+
+## Figure images
+
+Read `docs/figures.md` before you add a screenshot or any PNG figure: the image carries no margin of its own (the tool draws the frame), and a window capture is cropped by its frame extents so every capture has the same edges.
