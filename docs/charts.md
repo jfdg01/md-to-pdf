@@ -2,6 +2,7 @@
 
 How to make a chart for a report, and the rules that keep every chart in every report looking the same.
 `docs/charts/example.py` is a working generator with three sample charts. This file explains it.
+Un infográfico (una figura que cuenta una prueba entera, como una diapositiva) sigue este doc y además `docs/infographics.md`.
 
 A chart is a plain **SVG image**. `md-to-pdf` needs no special support: it embeds the file like any other
 image, and the Markdown alt text becomes the numbered caption.
