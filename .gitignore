@@ -4,3 +4,4 @@ __pycache__/
 
 # Generated test artifacts
 tests/*.pdf
+tests/a[1-5].md

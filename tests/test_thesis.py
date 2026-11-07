@@ -186,6 +186,20 @@ def test_ieee_month():
     assert "<em>J</em>, oct. 2024." in body_of(render("## S\n\n[@a]\n", entries)[0])
 
 
+def test_cover_toc_and_indexes_off():
+    md = ("## S\n\nSee [[fig-1-1]] and HTML.\n\n![Cat](c.png)\n\n"
+          "*[HTML]: HyperText Markup Language\n")
+    on = render(md)[0]
+    assert 'class="toc-page"' in on and '<div class="idx-block"' in on and "<header" not in on
+    off = render(md, cover="false", toc="false", figure_index="false",
+                 acronym_index="false", subtitle="Sub")[0]
+    assert 'class="toc-page"' not in off and '<div class="idx-block"' not in off
+    assert '<header class="doc-head"><p class="doc-title">T</p>' in off
+    assert 'class="subtitle">Sub<' in off and "@page :first" in off
+    assert 'class="abbr"' not in off and "HTML" in body_of(off)
+    assert 'class="xref"' in off
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

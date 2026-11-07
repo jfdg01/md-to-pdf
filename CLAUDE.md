@@ -29,3 +29,7 @@ Las normas de `docs/` son el punto de partida, no un techo. Una forma mejor de h
 ## Figure images
 
 Read `docs/figures.md` before you add a screenshot or any PNG figure: the image carries no margin of its own (the tool draws the frame), and a window capture is cropped by its frame extents so every capture has the same edges.
+
+## Las pruebas
+
+Lee `docs/testing.md` antes de añadir una opción o una función: una opción nueva entra en la matriz de `tests/matrix.py`, y una función nueva en `tests/body.md`.

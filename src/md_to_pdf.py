@@ -437,6 +437,15 @@ html, body {
 .cover .logo      { max-width: 180px; max-height: 180px; object-fit: contain; margin: 40px 0; }
 .cover .author    { font-size: 1.1818rem; font-style: italic; color: #333; padding-bottom: 1cm; }
 
+/* ── Title block on page 1 of a document without a cover ── */
+.doc-head { text-align: center; margin-bottom: 28px; }
+.doc-head .doc-title {
+    font-family: 'Space Grotesk', Arial, sans-serif;
+    font-size: 1.7273rem; font-weight: bold; line-height: 1.3; margin: 0 0 6px 0;
+}
+.doc-head .subtitle { font-style: italic; color: #444; margin: 0 0 4px 0; }
+.doc-head .meta-line, .doc-head .author { color: #555; margin: 2px 0; }
+
 /* ── Table of contents ── */
 .toc-page { break-after: page; font-family: 'Source Serif 4', Georgia, serif; }
 .toc-page h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 1.5455rem; margin-bottom: 20px; }
@@ -554,7 +563,7 @@ caption { caption-side: bottom; font-size: 0.8636rem; color: #555; padding-top: 
 .eq-num { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
 
 /* ── References (IEEE): the [n] in a left column, the text in a block ── */
-a.cite { text-decoration: none; }
+a.cite, a.xref { text-decoration: none; }
 .ref-entry { margin: 6px 0; padding-left: 2.6em; text-indent: -2.6em; }
 .ref-num { display: inline-block; width: 2.6em; text-indent: 0; }
 .ref-url { overflow-wrap: anywhere; }
@@ -601,10 +610,11 @@ def _css_str(s):
 # separately, inside the @page margin boxes.
 FONT_SIZE_SELECTORS = {
     "text_size":     "html, body",             # the body text
-    "title_size":    ".cover h1",              # the cover title
-    "subtitle_size": ".cover .subtitle",       # the cover subtitle
-    "comment_size":  ".cover .meta-line",      # the cover comment line
-    "author_size":   ".cover .author",         # the cover author line
+    # the cover, or the title block on page 1 of a document without a cover
+    "title_size":    ".cover h1, .doc-head .doc-title",
+    "subtitle_size": ".cover .subtitle, .doc-head .subtitle",
+    "comment_size":  ".cover .meta-line, .doc-head .meta-line",
+    "author_size":   ".cover .author, .doc-head .author",
     "h1_size":       ".body h1",               # body headings, per level
     "h2_size":       ".body h2",
     "h3_size":       ".body h3",
@@ -823,6 +833,17 @@ _META_ALIASES = {
     "leyendas": "caption_position",
     "bibliography": "bibliography", "bibliografia": "bibliography",
     "bibliografía": "bibliography", "bib": "bibliography",
+    # The cover, the TOC and each index can be switched off.
+    "cover": "cover", "portada": "cover",
+    "toc": "toc", "indice": "toc", "índice": "toc",
+    "figure_index": "figure_index", "indice_figuras": "figure_index",
+    "índice_figuras": "figure_index",
+    "table_index": "table_index", "indice_tablas": "table_index",
+    "índice_tablas": "table_index",
+    "code_index": "code_index", "indice_codigo": "code_index",
+    "índice_código": "code_index",
+    "acronym_index": "acronym_index", "lista_siglas": "acronym_index",
+    "siglas": "acronym_index",
     # .theme file (path relative to the .md, like `logo`).
     "theme": "theme", "tema": "theme", "estilo": "theme", "style": "theme",
     "theme_file": "theme", "fichero_tema": "theme", "archivo_tema": "theme",
@@ -896,6 +917,8 @@ DEFAULT_META = {
     "header_size": "", "footer_size": "",
     "toc_size": "", "toc1_size": "", "toc2_size": "", "toc3_size": "",
     "toc4_size": "",
+    "cover": "true", "toc": "true", "figure_index": "true", "table_index": "true",
+    "code_index": "true", "acronym_index": "true",
 }
 
 
@@ -1578,11 +1601,12 @@ _ABBR_RE = re.compile(r'<abbr title="([^"]*)">(.*?)</abbr>')
 _LINK_OR_ABBR_RE = re.compile(r'<a\b[^>]*>.*?</a>|' + _ABBR_RE.pattern, re.DOTALL)
 
 
-def link_acronyms(html):
+def link_acronyms(html, link=True):
     """Turn each `<abbr>` of the `abbr` extension (`*[HTML]: definition`) into a
     link to the acronym's entry in the list of acronyms. An acronym inside a
     link stays plain text, because a link cannot hold a link. Returns (html,
-    [(acronym, definition)]) with the used acronyms in alphabetical order."""
+    [(acronym, definition)]) with the used acronyms in alphabetical order. With
+    `link=False` (no list of acronyms) every acronym stays plain text."""
     found = {}
 
     def plain(m):
@@ -1590,7 +1614,7 @@ def link_acronyms(html):
         return m.group(2)
 
     def repl(m):
-        if m.group(1) is None:
+        if m.group(1) is None or not link:
             return _ABBR_RE.sub(plain, m.group(0))
         found[m.group(2)] = m.group(1)
         return f'<a class="abbr" href="#{_slug("abbr", m.group(2))}">{m.group(2)}</a>'
@@ -1689,8 +1713,12 @@ def heading_css(base, page_break):
     """Page break before every top-level section, only when `page_break` is on
     (off by default). `base` is the document's own top heading level (see
     detect_base_level), so a `#`-based document breaks on `#` and a `##`-based
-    one on `##`."""
-    return f".body h{base} {{ break-before: page; }}" if page_break else ""
+    one on `##`. A section that opens the body right after the title block (no
+    cover, no TOC, no lists) stays on page 1 with the title."""
+    if not page_break:
+        return ""
+    return (f".body h{base} {{ break-before: page; }}"
+            f".doc-head + .body > h{base}:first-child {{ break-before: auto; }}")
 
 
 def outline_css(depth, base=2):
@@ -1711,9 +1739,11 @@ def outline_css(depth, base=2):
     return "\n".join(lines)
 
 
-def _indices_html(figures, tables, code_blocks, strings, acronyms=()):
+def _indices_html(figures, tables, code_blocks, strings, acronyms, meta):
     """Build the indexes section (figures, tables, code blocks, acronyms) for
-    the non-empty ones."""
+    the non-empty ones whose key (`figure_index`, `table_index`…) is not off."""
+    on = lambda key: _truthy(meta[key])
+
     def _block(title, rows):
         items = "\n".join(f'    <li>{r}</li>' for r in rows)
         return (
@@ -1727,12 +1757,13 @@ def _indices_html(figures, tables, code_blocks, strings, acronyms=()):
                 f'<span class="idx-label">{escape(num_label)}</span>{cap}</a>')
 
     parts = []
-    for items, key in ((figures, "idx_figures"), (tables, "idx_tables"),
-                       (code_blocks, "idx_code")):
-        if items:
+    for items, key, flag in ((figures, "idx_figures", "figure_index"),
+                             (tables, "idx_tables", "table_index"),
+                             (code_blocks, "idx_code", "code_index")):
+        if items and on(flag):
             rows = [_row(nl, cap, aid) for nl, cap, aid in items]
             parts.append(_block(strings[key], rows))
-    if acronyms:
+    if acronyms and on("acronym_index"):
         rows = "".join(f'<dt id="{_slug("abbr", t)}">{t}</dt><dd>{d}</dd>'
                        for t, d in acronyms)
         parts.append(f'<div class="idx-block">\n  <h2>{strings["idx_abbr"]}</h2>\n'
@@ -1772,6 +1803,16 @@ def cover_html(meta, logo_uri, strings, page_size):
 </div>
 </body>
 </html>"""
+
+
+def doc_head_html(meta, strings):
+    """Title block at the top of page 1 when the document has no cover: title,
+    subtitle, comment and author, with no logo."""
+    lines = [("doc-title", meta["title"]), ("subtitle", meta["subtitle"]),
+             ("meta-line", meta["comment"]),
+             ("author", meta["author"] and f'{strings["by"]} {meta["author"]}')]
+    tags = "".join(f'<p class="{c}">{escape(t)}</p>' for c, t in lines if t)
+    return f'<header class="doc-head">{tags}</header>\n' if tags else ""
 
 
 def content_html(meta, body_md, strings, code_style, page_size, bib_entries=None):
@@ -1849,21 +1890,24 @@ def content_html(meta, body_md, strings, code_style, page_size, bib_entries=None
     body = resolve_cross_refs(body, figures, tables, code_blocks, equations)
     warn_uncited(body, (*figures, *tables, *code_blocks, *equations), strings)
     body = apply_keep_with_prev(body)
-    body, acronyms = link_acronyms(body)
-    indices = _indices_html(figures, tables, code_blocks, strings, acronyms)
+    body, acronyms = link_acronyms(body, _truthy(meta["acronym_index"]))
+    indices = _indices_html(figures, tables, code_blocks, strings, acronyms, meta)
+    toc_page = (f'<div class="toc-page">\n  <h2>{strings["toc"]}</h2>\n  {toc_tree}\n</div>\n'
+                if _truthy(meta["toc"]) else "")
+    # Without a cover, page 1 opens with the title block, and its page header
+    # stays empty so the title does not appear twice.
+    head = "" if _truthy(meta["cover"]) else doc_head_html(meta, strings)
+    first_css = ("" if _truthy(meta["cover"])
+                 else "@page :first { @top-center { content: none; } }")
     lang = meta.get("lang", "es")
 
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{heading_css(base, _truthy(meta.get("page_break")))}{outline_css(toc_depth, base)}{CAPTION_TOP_CSS if caption_top else ""}</style>
+<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{heading_css(base, _truthy(meta.get("page_break")))}{outline_css(toc_depth, base)}{CAPTION_TOP_CSS if caption_top else ""}{first_css}</style>
 </head>
 <body>
-<div class="toc-page">
-  <h2>{strings["toc"]}</h2>
-  {toc_tree}
-</div>
-{indices}<main class="body">{body}</main>
+{head}{toc_page}{indices}<main class="body">{body}</main>
 </body>
 </html>"""
 
@@ -1874,7 +1918,8 @@ def merge_pdfs(cover_bytes, content_bytes, meta):
     """Prepend the cover to the content, preserving the outline and internal links
     (pypdf re-adjusts the pages), and write the document metadata."""
     writer = pypdf.PdfWriter()
-    writer.append(io.BytesIO(cover_bytes))
+    if cover_bytes:
+        writer.append(io.BytesIO(cover_bytes))
     writer.append(io.BytesIO(content_bytes))
 
     info = {tag: val for tag, val in (
@@ -2007,9 +2052,9 @@ def convert_one(md_path, out_path=None):
     bib_entries = load_bibliography(md_path, meta)
     html = content_html(meta, body_md, strings, code_style, page_size, bib_entries)
     content_pdf = fit_wide_tables(html, base_url).write_pdf()
-    cover_pdf = weasyprint.HTML(
+    cover_pdf = (weasyprint.HTML(
         string=cover_html(meta, logo_uri, strings, page_size),
-        base_url=base_url).write_pdf()
+        base_url=base_url).write_pdf() if _truthy(meta["cover"]) else None)
 
     pdf_bytes = merge_pdfs(cover_pdf, content_pdf, meta)
     pdf_path.write_bytes(pdf_bytes)
@@ -2135,6 +2180,16 @@ def collect_md_files(args):
     return md_files, watch_dirs
 
 
+USAGE = """Usage: md-to-pdf [--watch] [-o output.pdf] <file.md | directory> ...
+
+Converts each Markdown file to a PDF next to it, with the same name.
+
+Options:
+  -o, --output FILE  name or path of the PDF (only with a single .md)
+  -w, --watch        rebuild the PDF on every save (Ctrl-C to stop)
+  -h, --help         show this help"""
+
+
 def main():
     watch = False
     output = None
@@ -2143,6 +2198,9 @@ def main():
     i = 0
     while i < len(rest):
         arg = rest[i]
+        if arg in ("--help", "-h"):
+            print(USAGE)
+            return
         if arg in ("--watch", "-w"):
             watch = True
         elif arg in ("--output", "-o"):
@@ -2161,7 +2219,7 @@ def main():
         i += 1
 
     if not args:
-        print("Usage: md-to-pdf [--watch] [-o output.pdf] <file.md | directory> ...")
+        print(USAGE)
         sys.exit(1)
 
     md_files, watch_dirs = collect_md_files(args)

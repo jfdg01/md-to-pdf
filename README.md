@@ -66,6 +66,7 @@ md-to-pdf a.md b.md              # several files
 md-to-pdf notes/                 # every .md in a directory (no recursion)
 md-to-pdf report.md -o final.pdf # choose the output name/path
 md-to-pdf --watch report.md      # rebuild on every save (Ctrl-C to stop)
+md-to-pdf --help                 # list the options
 ```
 
 Each PDF is written next to its `.md` with the same name, unless `-o`/`--output`
@@ -122,9 +123,14 @@ If `title` is omitted, the first `# ` heading in the body is used.
 | `theme`          | Path to a `.theme` file of shared defaults (see Theme files)   | Whole document      |
 | `caption_position` | `top` puts every caption above its figure, table or code block (default below) | Captions |
 | `bibliography`   | Path to a `.bib` file, relative to the `.md` (see References)  | References          |
+| `cover`          | `false` drops the cover; page 1 opens with a title block (title, subtitle, comment, author) | Cover |
+| `toc`            | `false` drops the table of contents (the PDF bookmarks stay)   | TOC                 |
+| `figure_index`, `table_index`, `code_index`, `acronym_index` | `false` drops that list (default `true`); without the list of acronyms, an acronym is plain text | Indexes |
 
 Spanish aliases are accepted (`titulo`, `autor`, `imagen`, `idioma`,
-`numeracion`, `tamaño`, `orientacion`, `margenes`, `leyendas`, `bibliografia`…). Margins can also be set per side with `margin_top`,
+`numeracion`, `tamaño`, `orientacion`, `margenes`, `leyendas`, `bibliografia`,
+`portada`, `indice`, `indice_figuras`, `indice_tablas`, `indice_codigo`,
+`lista_siglas`…). Margins can also be set per side with `margin_top`,
 `margin_right`, `margin_bottom`, `margin_left`.
 
 ### Body rules
@@ -189,7 +195,8 @@ A table wider than the text block (usually a long `code` identifier that cannot 
 Link to a figure/table/code block by its number with double brackets:
 `[[fig-2-1]]`, `[[tab-2-1]]`, `[[code-2-1]]`, `[[eq-2-1]]` (format:
 `type-section-index`). It becomes a link whose visible text is the number
-("Figure 2.1"). Unknown anchors are left untouched and reported on the console.
+("Figure 2.1"), in the link colour and with no underline, like a citation
+`[n]`. Unknown anchors are left untouched and reported on the console.
 
 The console also warns about each figure, table, code block and formula that
 the text never cites, or that appears before its first cross-reference. The
