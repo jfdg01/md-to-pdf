@@ -122,7 +122,7 @@ If `title` is omitted, the first `# ` heading in the body is used.
 | `*_size`         | Per-section font sizes (see Font sizes)                        | The matching part   |
 | `theme`          | Path to a `.theme` file of shared defaults (see Theme files)   | Whole document      |
 | `caption_position` | `top` puts every caption above its figure, table or code block (default below) | Captions |
-| `bibliography`   | Path to a `.bib` file, relative to the `.md` (see References)  | References          |
+| `bibliography`   | La ruta a un archivo `.bib`, relativa al `.md` (ver Referencias) | Referencias       |
 | `cover`          | `false` drops the cover; page 1 opens with a title block (title, subtitle, comment, author) | Cover |
 | `toc`            | `false` drops the table of contents (the PDF bookmarks stay)   | TOC                 |
 | `figure_index`, `table_index`, `code_index`, `acronym_index` | `false` drops that list (default `true`); without the list of acronyms, an acronym is plain text | Indexes |
@@ -230,18 +230,32 @@ its LaTeX error.
 text links to the "List of acronyms", which comes after the other indexes in
 alphabetical order.
 
-### References (IEEE)
+### Referencias (IEEE)
 
-Set `bibliography: refs.bib` and cite with `[@key]` or `[@key1; @key2]`. Each
-key gets a number in the order of its first citation, and a "References"
-section at the end lists them in IEEE style. Each `[n]` links to its entry, and
-each URL is a link. A key that is not in the `.bib` stays as text and is
-reported on the console.
+Pon `bibliography: refs.bib` y cita con `[@clave]` o `[@clave1; @clave2]`. Cada
+clave recibe un número en el orden de su primera cita, y una sección
+«Referencias» al final las lista en estilo IEEE. Cada `[n]` enlaza con su
+entrada, y cada URL es un enlace. Una clave que no está en el `.bib` queda como
+texto, y la consola la avisa.
 
-The `.bib` must be UTF-8: write `Pérez`, not `P{\'e}rez`. Write a compound
-surname first, with a comma: `Dibo Gómez, J. F.`. The formats cover `article`,
-`inproceedings`, `incollection`, `book`, `phdthesis`, `mastersthesis` and
-`techreport`. Any other type uses the `misc` format.
+El `.bib` va en BibLaTeX normal, en UTF-8 o con acentos de LaTeX: `Pérez` y
+`P{\'e}rez` dan «Pérez». Un apellido compuesto va primero, con una coma:
+`Dibo Gómez, J. F.`. Los formatos cubren `article`, `inproceedings`,
+`incollection`, `book`, `phdthesis`, `mastersthesis` y `techreport`. Otro tipo
+usa el formato `misc`, que muestra el contenedor (`howpublished`), la nota
+(`note`) y la fecha.
+
+La referencia sigue la lengua del documento (`locale`):
+
+| Parte | `locale: es` | `locale: en` |
+|---|---|---|
+| El título | «Quick Start», | “Quick Start,” |
+| La fecha | 13 jun. 2026 | Jun. 13, 2026 |
+| La fecha de acceso | Accedido: 7 nov. 2026. | Accessed: Nov. 7, 2026. |
+
+La fecha sale del campo `date`, en ISO: `2026`, `2026-06` o `2026-06-13`. Sin
+`date`, sale de `month` y `year`. El campo `urldate` también va en ISO. Una
+fecha que no está en ISO sale tal cual.
 
 ### Keep with previous
 
