@@ -26,7 +26,8 @@ Mono) ship with the repo in `assets/fonts/`.
   ```
   On Windows, install them via WeasyPrint's docs (GTK runtime).
 
-Python dependencies (`markdown`, `weasyprint`, `pypdf`, `watchdog`, `pygments`)
+Python dependencies (`markdown`, `weasyprint`, `pypdf`, `watchdog`, `pygments`,
+`pybtex`, `ziamath`)
 are declared in `pyproject.toml` and pinned in `uv.lock`. `uv sync`
 installs them into a project-local virtual environment (`.venv/`).
 
@@ -119,9 +120,11 @@ If `title` is omitted, the first `# ` heading in the body is used.
 | `margins`        | Body margins as CSS (`1.15in 0.85in 0.95in 0.85in`)           | Whole document      |
 | `*_size`         | Per-section font sizes (see Font sizes)                        | The matching part   |
 | `theme`          | Path to a `.theme` file of shared defaults (see Theme files)   | Whole document      |
+| `caption_position` | `top` puts every caption above its figure, table or code block (default below) | Captions |
+| `bibliography`   | Path to a `.bib` file, relative to the `.md` (see References)  | References          |
 
 Spanish aliases are accepted (`titulo`, `autor`, `imagen`, `idioma`,
-`numeracion`, `tamaño`, `orientacion`, `margenes`…). Margins can also be set per side with `margin_top`,
+`numeracion`, `tamaño`, `orientacion`, `margenes`, `leyendas`, `bibliografia`…). Margins can also be set per side with `margin_top`,
 `margin_right`, `margin_bottom`, `margin_left`.
 
 ### Body rules
@@ -166,6 +169,17 @@ refuses to build the PDF. Add it with an HTML comment on the line just above:
 
 Images may instead use their alt text (`![alt](img)`) as the caption.
 
+Two to four images on one line make one figure, in a row. Each alt text becomes
+a sub-caption, "(a) alt", "(b) alt", under its image. The row needs its own
+`<!-- caption: -->` for the whole figure:
+
+```markdown
+<!-- caption: Before and after the process -->
+![Before](a.png) ![After](b.png)
+```
+
+A caption may hold a formula or a citation.
+
 The tool draws the dashed frame and its 4 px gap, so a figure PNG must have no margin of its own. See [`docs/figures.md`](docs/figures.md) for how to capture a window and crop it.
 
 A table wider than the text block (usually a long `code` identifier that cannot wrap) is fitted automatically: its text shrinks down to 9 pt; if that is not enough, it is centred and overhangs both margins equally, up to 0.5 cm from the page edge. A table that still does not fit is left as is and reported on the console (`warning: table N is wider than the page…`); split its columns or shorten the cell.
@@ -173,9 +187,54 @@ A table wider than the text block (usually a long `code` identifier that cannot 
 ### Cross-references
 
 Link to a figure/table/code block by its number with double brackets:
-`[[fig-2-1]]`, `[[tab-2-1]]`, `[[code-2-1]]` (format: `type-section-index`). It
-becomes a link whose visible text is the number ("Figure 2.1"). Unknown anchors
-are left untouched and reported on the console.
+`[[fig-2-1]]`, `[[tab-2-1]]`, `[[code-2-1]]`, `[[eq-2-1]]` (format:
+`type-section-index`). It becomes a link whose visible text is the number
+("Figure 2.1"). Unknown anchors are left untouched and reported on the console.
+
+The console also warns about each figure, table, code block and formula that
+the text never cites, or that appears before its first cross-reference. The
+PDF is still built.
+
+### Footnotes
+
+`Text[^1]` with `[^1]: The note.` anywhere in the file. The note goes to the
+foot of the page that cites it. A note keeps only its paragraphs: a list or a
+code block in a note is dropped, with a warning.
+
+### Formulas
+
+`$E = mc^2$` is an inline formula, in LaTeX. The two `$` touch the formula, so
+`$5 and $6` stays text: a space comes before the second `$`. A block formula goes between two `$$`
+lines:
+
+```markdown
+$$
+\sigma^2 = \frac{1}{n}\sum_{i=1}^{n} (x_i - \bar{x})^2
+$$
+```
+
+A block is numbered "(x.y)" on the right, per section, and `[[eq-x-y]]` cites
+it. It takes no caption and has no index. A bad formula stops the build with
+its LaTeX error.
+
+### Acronyms
+
+`*[PDF]: Portable Document Format` defines an acronym. Each use of "PDF" in the
+text links to the "List of acronyms", which comes after the other indexes in
+alphabetical order.
+
+### References (IEEE)
+
+Set `bibliography: refs.bib` and cite with `[@key]` or `[@key1; @key2]`. Each
+key gets a number in the order of its first citation, and a "References"
+section at the end lists them in IEEE style. Each `[n]` links to its entry, and
+each URL is a link. A key that is not in the `.bib` stays as text and is
+reported on the console.
+
+The `.bib` must be UTF-8: write `Pérez`, not `P{\'e}rez`. Write a compound
+surname first, with a comma: `Dibo Gómez, J. F.`. The formats cover `article`,
+`inproceedings`, `incollection`, `book`, `phdthesis`, `mastersthesis` and
+`techreport`. Any other type uses the `misc` format.
 
 ### Keep with previous
 

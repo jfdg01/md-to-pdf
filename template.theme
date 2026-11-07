@@ -36,6 +36,11 @@ page_break: false                     # new page per top-level section: true | f
 toc_depth: 4                          # deepest TOC level: 3 (###) | 4 (####) | 5
 
 
+# ── Captions & references ────────────────────────────────────────────────────
+caption_position: bottom              # bottom (default) | top
+# bibliography: refs.bib              # a .bib file, relative to the .md
+
+
 # ── Page geometry ────────────────────────────────────────────────────────────
 page_size:   a4                       # a4 (default), a5, a3, letter, legal, b5…
 orientation: portrait                 # portrait | landscape

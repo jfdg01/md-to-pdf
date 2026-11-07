@@ -72,6 +72,20 @@ STRINGS = {
         "figure":      "Figura",
         "table":       "Tabla",
         "code_block":  "Bloque de código",
+        "equation":    "Ecuación",
+        "idx_abbr":    "Lista de siglas",
+        "references":  "Referencias",
+        "and":         " y ",
+        "and_list":    " y ",
+        "in":          "en",
+        "no":          "n.º",
+        "phd":         "Tesis doctoral",
+        "ms":          "Trabajo fin de máster",
+        "techrep":     "Inf. téc.",
+        "months":      "ene. feb. mar. abr. may. jun. jul. ago. sep. oct. nov. dic.",
+        "accessed":    "Accedido:",
+        "online":      "[En línea].",
+        "available":   "Disponible:",
         "by":          "Realizado por",
     },
     "en": {
@@ -82,6 +96,20 @@ STRINGS = {
         "figure":      "Figure",
         "table":       "Table",
         "code_block":  "Code block",
+        "equation":    "Equation",
+        "idx_abbr":    "List of acronyms",
+        "references":  "References",
+        "and":         " and ",
+        "and_list":    ", and ",
+        "in":          "in",
+        "no":          "no.",
+        "phd":         "Ph.D. dissertation",
+        "ms":          "M.S. thesis",
+        "techrep":     "Tech. Rep.",
+        "months":      "Jan. Feb. Mar. Apr. May Jun. Jul. Aug. Sep. Oct. Nov. Dec.",
+        "accessed":    "Accessed:",
+        "online":      "[Online].",
+        "available":   "Available:",
         "by":          "By",
     },
 }
@@ -276,6 +304,93 @@ def extract_themed_blocks(body_md):
     return _THEMED_BLOCK_RE.sub(repl, body_md), blocks
 
 
+# ─────────────────────── Formulas ───────────────────────
+# `$...$` inline and `$$...$$` as a block, in LaTeX. ziamath (pure Python)
+# draws each one as an SVG; the formulas are swapped for markers before the
+# Markdown conversion, so a `_` or a `\` in the LaTeX stays intact.
+_INLINE_CODE_RE = re.compile(r'`+[^`]*`+')
+# Pandoc's rule: no space just inside the `$`, and no digit or word right after
+# the closing `$`, so a price like "$5 and $6" stays text.
+_INLINE_MATH_RE = re.compile(r'(?<![\\$\w])\$(?=\S)([^$\n]*?\S)\$(?![\w$])')
+_MATH_PX = 20   # ziamath draws at this size; math_svg turns it into em units
+
+
+def sub_prose(line, fn):
+    """Apply `fn` to the parts of a Markdown line outside inline code spans."""
+    parts, last = [], 0
+    for m in _INLINE_CODE_RE.finditer(line):
+        parts += [fn(line[last:m.start()]), m.group(0)]
+        last = m.end()
+    return "".join(parts) + fn(line[last:])
+
+
+def math_svg(latex, block):
+    """The SVG of one LaTeX formula, sized in em so it follows the text size and
+    sits on the text baseline. Raises ValueError on a formula ziamath rejects."""
+    import ziamath
+    ziamath.config.svg2 = False   # xlink:href, which WeasyPrint reads
+    try:
+        svg = ziamath.Latex(latex.strip(), size=_MATH_PX, inline=not block).svg()
+    except Exception as e:
+        raise ValueError(f"formula '{latex.strip()}': {e}")
+    m = re.match(r'<svg ([^>]*)width="([\d.]+)" height="([\d.]+)" '
+                 r'viewBox="[-\d.]+ ([-\d.]+)', svg)
+    w, h, top = (float(m.group(i)) for i in (2, 3, 4))
+    style = (f'width:{w / _MATH_PX:.3f}em;height:{h / _MATH_PX:.3f}em;'
+             f'vertical-align:{-(h + top) / _MATH_PX:.3f}em')
+    return svg.replace(m.group(0), f'<svg {m.group(1)}style="{style}" '
+                       f'viewBox="{m.group(0).split("viewBox=")[1][1:]}', 1)
+
+
+def extract_math(body_md):
+    """Swap each formula outside code for a marker. Returns (markdown,
+    {marker: html}, {marker: LaTeX}); the TOC shows the LaTeX. A block starts with a line that begins with `$$` and ends
+    with a line that ends with `$$`; it becomes a `<div class="math-block">`,
+    which add_asset_numbers numbers."""
+    tokens, sources = {}, {}
+
+    def put(html, latex):
+        token = f"MATHFORMULA{len(tokens)}MARKER"
+        tokens[token], sources[token] = html, latex.strip()
+        return token
+
+    def inline(text):
+        return _INLINE_MATH_RE.sub(lambda m: put(
+            f'<span class="math">{math_svg(m.group(1), False)}</span>', m.group(1)), text)
+
+    def block_html(latex):
+        return (f'<div class="math-block"><span class="math">'
+                f'{math_svg(latex, True)}</span></div>')
+
+    out, in_fence, block = [], False, None
+    for line in body_md.split("\n"):
+        st = line.strip()
+        if block is not None:
+            if st.endswith("$$"):
+                block.append(st[:-2])
+                latex = "\n".join(block)
+                out += ["", put(block_html(latex), latex), ""]
+                block = None
+            else:
+                block.append(line)
+        elif _FENCE_RE.match(line):
+            in_fence = not in_fence
+            out.append(line)
+        elif in_fence:
+            out.append(line)
+        elif st.startswith("$$"):
+            rest = st[2:]
+            if len(rest) >= 2 and rest.endswith("$$"):
+                out += ["", put(block_html(rest[:-2]), rest[:-2]), ""]
+            else:
+                block = [rest]
+        else:
+            out.append(sub_prose(line, inline))
+    if block is not None:
+        raise ValueError("a $$ formula block has no closing $$")
+    return "\n".join(out), tokens, sources
+
+
 # ─────────────────────────── CSS ───────────────────────────
 # The body text is 11pt (`text_size`). Every other size is in rem (a multiple of
 # the body size), so `text_size` scales the whole document. The value in rem is
@@ -343,6 +458,10 @@ html, body {
 .doc-index li { padding: 5px 0; }
 .doc-index a { text-decoration: none; color: #1a1a1a; }
 .idx-label { font-weight: bold; }
+.abbr-list { margin: 0; }
+.abbr-list dt { float: left; clear: left; width: 7em; font-weight: bold; padding: 3px 0; }
+.abbr-list dd { margin: 0 0 0 7.5em; padding: 3px 0; }
+a.abbr { color: inherit; text-decoration: none; }
 
 /* ── Content ── */
 a { color: #5a8fc4; }
@@ -402,6 +521,10 @@ figure img {
     /* A thin dashed frame, with a small transparent gap around the image. */
     padding: 4px; border: 0.75pt dashed #808080; box-sizing: border-box;
 }
+/* A row of 2-4 images: one figure, each image with its "(a) alt" sub-caption. */
+.img-row .row { display: table; width: 100%; table-layout: fixed; }
+.img-row .sub { display: table-cell; vertical-align: bottom; padding: 0 5px; }
+.subcap { display: block; font-size: 0.8636rem; color: #555; margin-top: 3px; }
 figcaption { font-size: 0.8636rem; color: #555; margin-top: 5px; font-style: italic; }
 caption { caption-side: bottom; font-size: 0.8636rem; color: #555; padding-top: 6px; font-style: italic; text-align: center; }
 .code-block { margin: 12px 0; break-inside: avoid; }
@@ -424,6 +547,26 @@ caption { caption-side: bottom; font-size: 0.8636rem; color: #555; padding-top: 
 .code-file .dots i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
 .code-file .dir { opacity: 0.55; }
 .code-file + .codehilite, .code-file + pre { border-radius: 0 0 6px 6px; }
+
+/* ── Formulas: an SVG per formula; a block one is centred, number on the right ── */
+.math svg { display: inline-block; }
+.math-block { position: relative; text-align: center; margin: 10px 0; break-inside: avoid; }
+.eq-num { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+
+/* ── References (IEEE): the [n] in a left column, the text in a block ── */
+a.cite { text-decoration: none; }
+.ref-entry { margin: 6px 0; padding-left: 2.6em; text-indent: -2.6em; }
+.ref-num { display: inline-block; width: 2.6em; text-indent: 0; }
+.ref-url { overflow-wrap: anywhere; }
+
+/* ── Footnotes: at the foot of the page of their call ── */
+.fn {
+    float: footnote; font-size: 0.8182rem; line-height: 1.4;
+    font-style: normal; font-weight: normal; color: #1a1a1a; text-align: left;
+}
+.fn-again { vertical-align: super; font-size: 0.7em; line-height: 1; }
+::footnote-call { content: counter(footnote); vertical-align: super; font-size: 0.7em; line-height: 1; }
+::footnote-marker { content: counter(footnote) ". "; }
 
 /* ── Keep with the previous element ──
    Prevents a page break *before* the element and lets the element itself split
@@ -627,6 +770,9 @@ def page_css(meta, strings, page_size):
         font-size: {footer_size}; color: #666;
         white-space: nowrap; overflow: hidden;
     }}
+    @footnote {{
+        border-top: 0.5pt solid #999; padding-top: 4pt; margin-top: 8pt;
+    }}
     @bottom-right {{
         content: counter(page) " / " counter(pages);
         font-family: 'Space Grotesk', Arial, sans-serif;
@@ -672,6 +818,11 @@ _META_ALIASES = {
     "margin_right": "margin_right", "margen_derecho": "margin_right",
     "margin_bottom": "margin_bottom", "margen_inferior": "margin_bottom",
     "margin_left": "margin_left", "margen_izquierdo": "margin_left",
+    "caption_position": "caption_position", "captions": "caption_position",
+    "posicion_leyenda": "caption_position", "posición_leyenda": "caption_position",
+    "leyendas": "caption_position",
+    "bibliography": "bibliography", "bibliografia": "bibliography",
+    "bibliografía": "bibliography", "bib": "bibliography",
     # .theme file (path relative to the .md, like `logo`).
     "theme": "theme", "tema": "theme", "estilo": "theme", "style": "theme",
     "theme_file": "theme", "fichero_tema": "theme", "archivo_tema": "theme",
@@ -734,7 +885,7 @@ DEFAULT_META = {
     "page_break": "false", "toc_depth": "",
     "page_size": "", "orientation": "", "margins": "",
     "margin_top": "", "margin_right": "", "margin_bottom": "",
-    "margin_left": "",
+    "margin_left": "", "caption_position": "", "bibliography": "",
     "theme": "",
     "text_size": "", "title_size": "",
     "subtitle_size": "", "comment_size": "", "author_size": "",
@@ -973,18 +1124,19 @@ def apply_toc_markers(body_md):
     return "\n".join(out)
 
 
-# Cross-reference `[[fig-2-1]]` / `[[tab-1-1]]` / `[[code-3-2]]`: points at the
+# Cross-reference `[[fig-2-1]]` / `[[tab-1-1]]` / `[[code-3-2]]` / `[[eq-2-1]]`: points at the
 # anchors add_asset_numbers generates. The pattern is strict (type-x-y) so it
 # doesn't capture double brackets that appear by chance in the text or code.
-_XREF_RE = re.compile(r'\[\[\s*((?:fig|tab|code)-\d+-\d+)\s*\]\]')
+_XREF_RE = re.compile(r'\[\[\s*((?:fig|tab|code|eq)-\d+-\d+)\s*\]\]')
 
 
-def resolve_cross_refs(html, figures, tables, code_blocks):
+def resolve_cross_refs(html, figures, tables, code_blocks, equations=()):
     """Resolve cross-references `[[fig-2-1]]` into a link to the element's anchor,
     showing its number as the visible text (e.g. "Figure 2.1"). Warns about
     references to non-existent anchors and leaves them untouched so the author can
     find them (same as with an unknown `code_theme`)."""
-    labels = {aid: nl for nl, cap, aid in (*figures, *tables, *code_blocks)}
+    labels = {aid: nl for nl, cap, aid in (*figures, *tables, *code_blocks,
+                                           *equations)}
 
     def repl(m):
         aid = m.group(1)
@@ -996,6 +1148,200 @@ def resolve_cross_refs(html, figures, tables, code_blocks):
         return f'<a href="#{aid}" class="xref">{escape(label)}</a>'
 
     return _XREF_RE.sub(repl, html)
+
+
+# ─────────────────────── Bibliography (IEEE) ───────────────────────
+# `bibliography: refs.bib` in the front matter (path relative to the .md) and
+# `[@key]` or `[@a; @b]` in the text. Each cited key gets a number `[n]` in order
+# of first appearance; a "References" section at the end lists the cited
+# entries in IEEE style, each one the target of its `[n]` links.
+_CITE_GROUP_RE = re.compile(r'\[@[^\]]+\]')
+_CITE_KEY_RE = re.compile(r'@([\w:.\-]+)')
+_BIB_URL_RE = re.compile(r'\\url\s*\{([^}]*)\}')
+
+
+def load_bibliography(md_path, meta):
+    """The entries of the `.bib` named in `bibliography:` (a case-insensitive
+    dict key -> pybtex entry), or {} with no `bibliography`. Raises ValueError
+    if the file does not exist."""
+    field = (meta.get("bibliography") or "").strip()
+    if not field:
+        return {}
+    bib_path = md_path.parent / field
+    if not bib_path.exists():
+        raise ValueError(f"bibliography '{field}' not found")
+    from pybtex.database import parse_file
+    return parse_file(str(bib_path)).entries
+
+
+def _slug(prefix, text):
+    return prefix + "-" + re.sub(r'[^a-z0-9]+', '-', text.lower()).strip('-')
+
+
+def _clean(value):
+    """Plain text of a BibTeX field: no braces, no stray whitespace."""
+    return " ".join(str(value).replace("{", "").replace("}", "").split())
+
+
+def _ieee_name(p):
+    """Initials first: "J. F. Dibo Gómez". A compound surname is written in
+    the `.bib` as `{Dibo Gómez, J. F.}`."""
+    initials = " ".join(f"{n[0]}." for n in map(_clean, p.first_names + p.middle_names)
+                        if n)
+    last = _clean(" ".join(p.prelast_names + p.last_names + p.lineage_names))
+    return f"{initials} {last}".strip()
+
+
+def _ieee_authors(entry, strings):
+    """IEEE list: "A", "A and B", "A, B, and C"; seven or more: "A et al."."""
+    people = entry.persons.get("author") or entry.persons.get("editor") or []
+    names = [_ieee_name(p) for p in people]
+    if len(names) >= 7:
+        return f"{names[0]} et al."
+    if len(names) <= 2:
+        return strings["and"].join(names)
+    return ", ".join(names[:-1]) + strings["and_list"] + names[-1]
+
+
+def _entry_url(entry):
+    """The entry's link: `url`, or the `\\url{...}` (or bare URL) in
+    `howpublished`, or the `doi` through doi.org. Empty string with none."""
+    f = entry.fields
+    url = _clean(f.get("url", ""))
+    howpub = str(f.get("howpublished", "")).strip()
+    if not url:
+        m = _BIB_URL_RE.search(howpub)
+        url = m.group(1).strip() if m else (
+            howpub if howpub.startswith(("http://", "https://")) else "")
+    if not url and f.get("doi"):
+        url = f"https://doi.org/{_clean(f['doi'])}"
+    return url
+
+
+class _Quoted(str):
+    """A title that goes in quotes: the comma or period after it goes inside."""
+
+
+def _ieee_join(segs):
+    """Join the non-empty parts with commas and end with a period."""
+    out = [s for s in segs if s]
+    parts = []
+    for i, seg in enumerate(out):
+        end = "." if i == len(out) - 1 else ","
+        if isinstance(seg, _Quoted):
+            parts.append(f"“{seg}{end}”")
+        else:
+            parts.append(seg if end == "." and seg.endswith(".") else seg + end)
+    return " ".join(parts)
+
+
+# The first three letters of a month in English or Spanish, as `month = oct`
+# (pybtex expands it to "October"), `{octubre}` or `{10}` write it.
+_MONTHS = {m: i % 12 for i, m in enumerate(
+    "jan feb mar apr may jun jul aug sep oct nov dec "
+    "ene feb mar abr may jun jul ago sep oct nov dic".split())}
+
+
+def _ieee_month(month, strings):
+    """A month in its IEEE short form ("Oct."), or the text as it is."""
+    key = month.strip().lower()
+    i = int(key) - 1 if key.isdigit() and 1 <= int(key) <= 12 else _MONTHS.get(key[:3])
+    return month if i is None else strings["months"].split()[i]
+
+
+def format_ieee(entry, strings):
+    """One reference in IEEE style, as HTML. A title is in quotes for an
+    article, a chapter, a paper or a web page, and in italics for a book or a
+    thesis; the container (journal, book, site) is in italics. With a link, the
+    entry ends with "Accessed: <urldate>. [Online]. Available: <url>"."""
+    f = {k.lower(): escape(_clean(v)) for k, v in entry.fields.items()}
+    kind = entry.type.lower()
+    title = f.get("title", "")
+    em = lambda v: f"<em>{v}</em>" if v else ""  # noqa: E731
+    pages = f.get("pages", "").replace("--", "–").replace("-", "–")
+    pages = (f"pp. {pages}" if "–" in pages else f"p. {pages}") if pages else ""
+    date = " ".join(x for x in (_ieee_month(f.get("month", ""), strings),
+                                f.get("year", "")) if x)
+    vol = f"vol. {f['volume']}" if f.get("volume") else ""
+    num = f"{strings['no']} {f['number']}" if f.get("number") else ""
+    place = ": ".join(x for x in (f.get("address", ""), f.get("publisher", "")) if x)
+    authors = escape(_ieee_authors(entry, strings))
+    within = f"{strings['in']} {em(f['booktitle'])}" if f.get("booktitle") else ""
+
+    if kind == "article":
+        segs = [authors, _Quoted(title), em(f.get("journal", "")), vol, num, pages, date]
+    elif kind in ("inproceedings", "conference"):
+        segs = [authors, _Quoted(title), within, f.get("address", ""), date, pages]
+    elif kind in ("incollection", "inbook"):
+        segs = [authors, _Quoted(title), within, place, date, pages]
+    elif kind in ("book", "proceedings"):
+        segs = [authors, em(title), place, date]
+    elif kind in ("phdthesis", "mastersthesis", "thesis"):
+        label = strings["ms"] if kind == "mastersthesis" else strings["phd"]
+        segs = [authors, em(title), label, f.get("school", ""), f.get("address", ""), date]
+    elif kind == "techreport":
+        rep_no = f"{strings['techrep']} {f.get('number', '')}".strip()
+        segs = [authors, _Quoted(title), f.get("institution", ""),
+                f.get("address", ""), rep_no, date]
+    else:   # misc, online, manual…: a web page, mostly
+        howpub = f.get("howpublished", "")
+        site = "" if "url" in howpub.lower() or howpub.startswith("http") else howpub
+        container = (site or f.get("organization") or f.get("publisher")
+                     or f.get("journal") or f.get("booktitle") or "")
+        segs = [authors, _Quoted(title), em(container), date]
+    text = _ieee_join(segs)
+
+    url = _entry_url(entry)
+    if url:
+        accessed = escape(_clean(entry.fields.get("urldate")
+                                 or entry.fields.get("accessed") or ""))
+        if accessed:
+            text += f" {strings['accessed']} {accessed}."
+        link = f'<a class="ref-url" href="{escape(url)}">{escape(url)}</a>'
+        text += f" {strings['online']} {strings['available']} {link}"
+    return text
+
+
+def map_prose(body_md, fn):
+    """Apply `fn` to the Markdown text outside code fences and code spans."""
+    out, in_fence = [], False
+    for line in body_md.split("\n"):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            out.append(line)
+        else:
+            out.append(line if in_fence else sub_prose(line, fn))
+    return "\n".join(out)
+
+
+def process_citations(body_md, entries, strings, base=2):
+    """Replace each `[@key]` with its linked `[n]` and append the References
+    section, at the document's top heading level `base`, so it is numbered and
+    enters the TOC like any other section. A key missing from the `.bib` stays
+    visible, with a warning."""
+    number = {}           # key (lowercase) -> (number, key)
+
+    def render_group(m):
+        parts = []
+        for key in _CITE_KEY_RE.findall(m.group(0)):
+            if key not in entries:
+                print(f"    (warning: citation '@{key}' is not in the bibliography)",
+                      file=sys.stderr)
+                parts.append(escape(f"[@{key}]"))
+                continue
+            n, _ = number.setdefault(key.lower(), (len(number) + 1, key))
+            parts.append(f'[<a href="#{_slug("ref", key)}" class="cite">{n}</a>]')
+        return ", ".join(parts)
+
+    body_md = map_prose(body_md, lambda t: _CITE_GROUP_RE.sub(render_group, t))
+    if not number:
+        return body_md
+    lines = [f'{"#" * base} {strings["references"]}', ""]
+    for n, key in number.values():
+        lines += [f'<p class="ref-entry" id="{_slug("ref", key)}">'
+                  f'<span class="ref-num">[{n}]</span>'
+                  f'{format_ieee(entries[key], strings)}</p>', ""]
+    return f"{body_md}\n\n" + "\n".join(lines)
 
 
 # ─────────────────────── Figure/table/code numbering ───────────────────────
@@ -1035,12 +1381,64 @@ def code_file_bar(path, box):
             f'<span class="dots">{dots}</span>{folder}{escape(name)}</div>')
 
 
-def add_asset_numbers(html, strings, base=2):
-    """Number figures, tables and code blocks (x.y, resetting on each top-level
-    section — `base` is the document's own top heading level, see
-    detect_base_level), add their label, and collect the data for the indexes.
+CAPTION_TOP_CSS = """
+caption { caption-side: top; padding: 0 0 6px; }
+figcaption { margin: 0 0 5px; }
+.code-label { margin: 0 0 4px; }
+.code-label, figcaption, caption { break-before: auto; break-after: avoid; }
+"""
 
-    Returns (html, figures, tables, code_blocks, missing). `missing` lists the
+
+def resolve_caption_top(meta):
+    """`caption_position`: `bottom` (default) or `top`. Warn on any other value."""
+    val = (meta.get("caption_position") or "").strip().lower()
+    if val in ("top", "above", "arriba", "encima"):
+        return True
+    if val not in ("", "bottom", "below", "abajo", "debajo"):
+        print(f"    (warning: unknown caption_position '{val}'; using bottom)",
+              file=sys.stderr)
+    return False
+
+
+# The HTML that a caption keeps: a formula, and a citation number.
+_CAPTION_HTML_RE = re.compile(
+    r'<span class="math">.*?</svg></span>|<a href="#ref-[^"]*" class="cite">\d+</a>',
+    re.DOTALL)
+
+
+def caption_html(text):
+    """Escape a caption, except its formulas and citation links."""
+    out, last = [], 0
+    for m in _CAPTION_HTML_RE.finditer(text):
+        out += [escape(text[last:m.start()]), m.group(0)]
+        last = m.end()
+    return "".join(out) + escape(text[last:])
+
+
+# A paragraph that holds only images (2 to 4) is one figure: a row.
+_IMG_ROW = r'<p>\s*<img\b[^>]*>(?:\s*<img\b[^>]*>)+\s*</p>'
+
+
+def image_row(par):
+    """The images of a row paragraph side by side, each with its alt text as a
+    sub-caption: "(a) Before", "(b) After"."""
+    cells = []
+    for i, img in enumerate(re.findall(r'<img\b[^>]*>', par)):
+        alt_m = re.search(r'\balt="([^"]*)"', img)
+        sub = f'({chr(97 + i)}) {alt_m.group(1)}' if alt_m and alt_m.group(1) \
+            else f'({chr(97 + i)})'
+        cells.append(f'<div class="sub">{img}<span class="subcap">{sub}</span></div>')
+    return f'<div class="row">{"".join(cells)}</div>'
+
+
+def add_asset_numbers(html, strings, base=2, caption_top=False):
+    """Number figures, tables, code blocks and equations (x.y, resetting on
+    each top-level section — `base` is the document's own top heading level,
+    see detect_base_level), add their label, and collect the data for the
+    indexes.
+
+    Returns (html, figures, tables, code_blocks, equations, missing). An
+    equation takes no caption: its label is "(x.y)". `missing` lists the
     labels of the elements WITHOUT a caption: an image uses its `alt`; tables and
     code blocks require `<!-- caption: -->`. If `missing` is not empty, the
     caller refuses to generate the PDF. A `<!-- file: path -->` above a code
@@ -1049,12 +1447,13 @@ def add_asset_numbers(html, strings, base=2):
     figs = [0]
     tabs = [0]
     codes = [0]
+    eqs = [0]
     pending_cap = [""]
     pending_file = [""]
-    figures, tables, code_blocks, missing = [], [], [], []
+    figures, tables, code_blocks, equations, missing = [], [], [], [], []
     pattern = re.compile(
         r'<!--\s*(?:caption|file):\s*.*?\s*-->'
-        rf'|<h{base}\b[^>]*>|<img\b[^>]*/?>|<table\b[^>]*>'
+        rf'|<h{base}\b[^>]*>|<div class="math-block">|{_IMG_ROW}|<img\b[^>]*/?>|<table\b[^>]*>'
         r'|<div[^>]*\bclass="codehilite"[^>]*>.*?</div>'
         r'|<pre\b[^>]*>.*?</pre>',
         re.DOTALL,
@@ -1073,24 +1472,40 @@ def add_asset_numbers(html, strings, base=2):
             return ""   # remove the comment from the output
         if lo.startswith(f'<h{base}'):
             section[0] += 1
-            figs[0] = tabs[0] = codes[0] = 0
+            figs[0] = tabs[0] = codes[0] = eqs[0] = 0
             pending_cap[0] = pending_file[0] = ""
             return tag
-        if lo.startswith('<img'):
+        if lo.startswith('<div class="math-block"'):
+            if not section[0]:
+                return tag
+            eqs[0] += 1
+            label = f"({section[0]}.{eqs[0]})"
+            eq_id = f"eq-{section[0]}-{eqs[0]}"
+            equations.append((label, "", eq_id))
+            return (f'<div class="math-block" id="{eq_id}">'
+                    f'<span class="eq-num">{label}</span>')
+        is_row = lo.startswith('<p>')
+        if is_row or lo.startswith('<img'):
             if not section[0]:
                 return tag
             figs[0] += 1
             num_label = f"{strings['figure']} {section[0]}.{figs[0]}"
+            if is_row and tag.count("<img") > 4:
+                raise ValueError(f"{num_label} has {tag.count('<img')} images: a row holds 2 to 4")
             fig_id = f"fig-{section[0]}-{figs[0]}"
             alt_m = re.search(r'\balt="([^"]*)"', tag)
-            alt = alt_m.group(1) if alt_m else ""
+            # A row's alts are its sub-captions, so only the comment captions it.
+            alt = alt_m.group(1) if alt_m and not is_row else ""
             caption = pending_cap[0] or alt
             pending_cap[0] = ""
             if not caption:
                 missing.append(num_label)
             figures.append((num_label, caption, fig_id))
-            rendered = escape(_full_label(num_label, caption))
-            return f'<figure id="{fig_id}">{tag}<figcaption>{rendered}</figcaption></figure>'
+            cap = f'<figcaption>{caption_html(_full_label(num_label, caption))}</figcaption>'
+            content = image_row(tag) if is_row else tag
+            inner = cap + content if caption_top else content + cap
+            cls = ' class="img-row"' if is_row else ""
+            return f'<figure id="{fig_id}"{cls}>{inner}</figure>'
         if lo.startswith('<table'):
             if not section[0]:
                 return tag
@@ -1102,7 +1517,7 @@ def add_asset_numbers(html, strings, base=2):
             if not caption:
                 missing.append(num_label)
             tables.append((num_label, caption, tab_id))
-            rendered = escape(_full_label(num_label, caption))
+            rendered = caption_html(_full_label(num_label, caption))
             return tag[:-1] + f' id="{tab_id}"><caption>{rendered}</caption>'
         if lo.startswith('<div') or lo.startswith('<pre'):
             if not section[0]:
@@ -1115,16 +1530,89 @@ def add_asset_numbers(html, strings, base=2):
             if not caption:
                 missing.append(num_label)
             code_blocks.append((num_label, caption, code_id))
-            rendered = escape(_full_label(num_label, caption))
+            rendered = caption_html(_full_label(num_label, caption))
             bar = code_file_bar(pending_file[0], tag) if pending_file[0] else ""
             pending_file[0] = ""
-            return (
-                f'<div class="code-block" id="{code_id}">{bar}{tag}'
-                f'<p class="code-label">{rendered}</p></div>'
-            )
+            label = f'<p class="code-label">{rendered}</p>'
+            inner = label + bar + tag if caption_top else bar + tag + label
+            return f'<div class="code-block" id="{code_id}">{inner}</div>'
         return tag
 
-    return pattern.sub(sub, html), figures, tables, code_blocks, missing
+    return pattern.sub(sub, html), figures, tables, code_blocks, equations, missing
+
+
+_FN_LIST_RE = re.compile(r'<div class="footnote">.*?</ol>\s*</div>', re.DOTALL)
+_FN_BACKREF_RE = re.compile(r'(?:&#160;)?<a class="footnote-backref"[^>]*>.*?</a>')
+_FN_CALL_RE = re.compile(r'<sup id="fnref(\d*):([^"]+)">.*?</sup>')
+
+
+def inline_footnotes(html):
+    """Move each note of the `footnotes` extension from its list at the end to
+    its first call, as a `<span class="fn">`: the CSS `float: footnote` puts the
+    span at the foot of its page. A later call of the same note shows only its
+    number. A note keeps its paragraphs, with a line break between them; any
+    other block (a list, code) is dropped with a warning."""
+    notes = {}
+    for block in _FN_LIST_RE.findall(html):
+        parts = re.split(r'<li id="fn:([^"]+)">', _FN_BACKREF_RE.sub("", block))
+        for fid, inner in zip(parts[1::2], parts[2::2]):
+            paras = [p.strip() for p in re.findall(r'<p>(.*?)</p>', inner, re.DOTALL)]
+            notes[fid] = "<br>".join(p for p in paras if p)
+            if re.sub(r'<p>.*?</p>|</?(?:li|ol|div)>|\s', "", inner, flags=re.DOTALL):
+                print(f"    (warning: footnote '{fid}' keeps only its paragraphs)",
+                      file=sys.stderr)
+    html = _FN_LIST_RE.sub("", html)
+    order = []
+
+    def call(m):
+        fid = m.group(2)
+        if fid in order:
+            return f'<sup class="fn-again">{order.index(fid) + 1}</sup>'
+        order.append(fid)
+        return f'<span class="fn">{notes.get(fid, "")}</span>'
+
+    return _FN_CALL_RE.sub(call, html)
+
+
+_ABBR_RE = re.compile(r'<abbr title="([^"]*)">(.*?)</abbr>')
+_LINK_OR_ABBR_RE = re.compile(r'<a\b[^>]*>.*?</a>|' + _ABBR_RE.pattern, re.DOTALL)
+
+
+def link_acronyms(html):
+    """Turn each `<abbr>` of the `abbr` extension (`*[HTML]: definition`) into a
+    link to the acronym's entry in the list of acronyms. An acronym inside a
+    link stays plain text, because a link cannot hold a link. Returns (html,
+    [(acronym, definition)]) with the used acronyms in alphabetical order."""
+    found = {}
+
+    def plain(m):
+        found[m.group(2)] = m.group(1)
+        return m.group(2)
+
+    def repl(m):
+        if m.group(1) is None:
+            return _ABBR_RE.sub(plain, m.group(0))
+        found[m.group(2)] = m.group(1)
+        return f'<a class="abbr" href="#{_slug("abbr", m.group(2))}">{m.group(2)}</a>'
+
+    html = _LINK_OR_ABBR_RE.sub(repl, html)
+    return html, sorted(found.items(), key=lambda kv: kv[0].lower())
+
+
+def warn_uncited(html, items, strings):
+    """Warn about each figure, table, code block or equation that the text never
+    cites with `[[...]]`, or that comes before its first cross-reference."""
+    for num_label, _, aid in items:
+        if aid.startswith("eq-"):
+            num_label = f'{strings["equation"]} {num_label}'
+        at = html.find(f'id="{aid}"')
+        ref = html.find(f'href="#{aid}"')
+        if ref < 0:
+            print(f"    (warning: {num_label} is not cited in the text)",
+                  file=sys.stderr)
+        elif ref > at:
+            print(f"    (warning: {num_label} appears before its first "
+                  f"cross-reference)", file=sys.stderr)
 
 
 def apply_keep_with_prev(html):
@@ -1223,8 +1711,9 @@ def outline_css(depth, base=2):
     return "\n".join(lines)
 
 
-def _indices_html(figures, tables, code_blocks, strings):
-    """Build the indexes section (figures/tables/code) for the non-empty ones."""
+def _indices_html(figures, tables, code_blocks, strings, acronyms=()):
+    """Build the indexes section (figures, tables, code blocks, acronyms) for
+    the non-empty ones."""
     def _block(title, rows):
         items = "\n".join(f'    <li>{r}</li>' for r in rows)
         return (
@@ -1233,7 +1722,7 @@ def _indices_html(figures, tables, code_blocks, strings):
         )
 
     def _row(num_label, caption, anchor_id):
-        cap = f": {escape(caption)}" if caption else ""
+        cap = f": {caption_html(caption)}" if caption else ""
         return (f'<a href="#{anchor_id}">'
                 f'<span class="idx-label">{escape(num_label)}</span>{cap}</a>')
 
@@ -1243,6 +1732,11 @@ def _indices_html(figures, tables, code_blocks, strings):
         if items:
             rows = [_row(nl, cap, aid) for nl, cap, aid in items]
             parts.append(_block(strings[key], rows))
+    if acronyms:
+        rows = "".join(f'<dt id="{_slug("abbr", t)}">{t}</dt><dd>{d}</dd>'
+                       for t, d in acronyms)
+        parts.append(f'<div class="idx-block">\n  <h2>{strings["idx_abbr"]}</h2>\n'
+                     f'  <dl class="abbr-list">{rows}</dl>\n</div>\n')
     if not parts:
         return ""
     return f'<div class="indices-section">\n{"".join(parts)}</div>\n'
@@ -1280,7 +1774,7 @@ def cover_html(meta, logo_uri, strings, page_size):
 </html>"""
 
 
-def content_html(meta, body_md, strings, code_style, page_size):
+def content_html(meta, body_md, strings, code_style, page_size, bib_entries=None):
     """TOC + indexes + body in a single HTML. Raises ValueError if any element
     lacks a caption."""
     # The document's own top heading level: `#` when the title comes from the
@@ -1299,7 +1793,7 @@ def content_html(meta, body_md, strings, code_style, page_size):
         # them into one <ul> (which rendered the numbers as bullets).
         tab_length=2,
         extensions=[TocExtension(toc_depth="1-6"), "tables", "fenced_code",
-                    "codehilite", "attr_list", "sane_lists"],
+                    "codehilite", "attr_list", "sane_lists", "footnotes", "abbr"],
         extension_configs={"codehilite": {
             "noclasses": True, "guess_lang": False, "pygments_style": code_style,
             "prestyles": f"color:{_style_fg(code_style)}",
@@ -1307,6 +1801,10 @@ def content_html(meta, body_md, strings, code_style, page_size):
             # PHP: highlight a snippet with no `<?php` tag (other lexers ignore it).
             "startinline": True}},
     )
+    # Citations become numbers and links, and the references go at the end:
+    # the reference list is a section, so it gets numbered and enters the TOC.
+    if bib_entries:
+        body_md = process_citations(body_md, bib_entries, strings, base)
     # Individual TOC marks (`<!-- toc -->` / `<!-- no-toc -->`): translated into
     # classes before numbering and converting (they work whether numbering is on
     # or off).
@@ -1319,10 +1817,19 @@ def content_html(meta, body_md, strings, code_style, page_size):
     # Blocks with their own theme are highlighted separately and re-injected after
     # conversion; the rest use the document-wide theme (code_style) via codehilite.
     body_md, themed_blocks = extract_themed_blocks(yml_fences(body_md))
+    body_md, formulas, formula_sources = extract_math(body_md)
     body = md.convert(body_md)
     toc_tokens = md.toc_tokens
-    for token, snippet in themed_blocks.items():
+
+    def unmark(tokens):
+        for tok in tokens:
+            for marker, latex in formula_sources.items():
+                tok["name"] = tok["name"].replace(marker, latex)
+            unmark(tok.get("children", []))
+    unmark(toc_tokens)
+    for token, snippet in (*themed_blocks.items(), *formulas.items()):
         body = body.replace(f"<p>{token}</p>", snippet).replace(token, snippet)
+    body = inline_footnotes(body)
 
     # Table of contents: default depth (toc_depth) + individual marks collected
     # from the classes apply_toc_markers left on the headings of the converted
@@ -1331,21 +1838,25 @@ def content_html(meta, body_md, strings, code_style, page_size):
     force_ids, skip_ids = collect_toc_overrides(body)
     toc_tree = build_toc_html(toc_tokens, toc_depth, force_ids, skip_ids)
 
-    body, figures, tables, code_blocks, missing = add_asset_numbers(body, strings, base)
+    caption_top = resolve_caption_top(meta)
+    body, figures, tables, code_blocks, equations, missing = add_asset_numbers(
+        body, strings, base, caption_top)
     if missing:
         raise ValueError(
             "elements without a caption (add <!-- caption: ... --> or an alt): "
             + ", ".join(missing)
         )
-    body = resolve_cross_refs(body, figures, tables, code_blocks)
+    body = resolve_cross_refs(body, figures, tables, code_blocks, equations)
+    warn_uncited(body, (*figures, *tables, *code_blocks, *equations), strings)
     body = apply_keep_with_prev(body)
-    indices = _indices_html(figures, tables, code_blocks, strings)
+    body, acronyms = link_acronyms(body)
+    indices = _indices_html(figures, tables, code_blocks, strings, acronyms)
     lang = meta.get("lang", "es")
 
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head><meta charset="utf-8">
-<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{heading_css(base, _truthy(meta.get("page_break")))}{outline_css(toc_depth, base)}</style>
+<style>{page_css(meta, strings, page_size)}{font_face_css()}{BASE_CSS}{font_size_css(meta)}{toc_size_css(meta)}{heading_css(base, _truthy(meta.get("page_break")))}{outline_css(toc_depth, base)}{CAPTION_TOP_CSS if caption_top else ""}</style>
 </head>
 <body>
 <div class="toc-page">
@@ -1493,7 +2004,8 @@ def convert_one(md_path, out_path=None):
     code_style = resolve_code_style(meta.get("code_theme"))
     page_size = resolve_page_size(meta)
 
-    html = content_html(meta, body_md, strings, code_style, page_size)
+    bib_entries = load_bibliography(md_path, meta)
+    html = content_html(meta, body_md, strings, code_style, page_size, bib_entries)
     content_pdf = fit_wide_tables(html, base_url).write_pdf()
     cover_pdf = weasyprint.HTML(
         string=cover_html(meta, logo_uri, strings, page_size),
